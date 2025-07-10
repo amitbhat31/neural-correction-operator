@@ -61,3 +61,19 @@ checkpoint:
 reproducibility:
   seed: 42
   deterministic: false 
+
+# New sampling configuration section
+sampling:
+  # Data loading parameters
+  start_ind: 0
+  end_ind: 100
+  batch_size: 1
+  
+  # Model loading parameters
+  model_path: "path/to/your/trained_model.pth"
+  
+  # Output parameters
+  samples_path: "path/to/save/samples.npy"
+  
+  # Processing parameters
+  clip_coeff: 1.0 

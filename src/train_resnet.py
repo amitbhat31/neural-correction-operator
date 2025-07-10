@@ -26,9 +26,9 @@ def main(cfg: DictConfig):
         torch.backends.cudnn.benchmark = cfg.system.cudnn_benchmark
 
     # Define grid - spanning [-0.5, 0.5] × [-0.5, 0.5]
-    Nx_f = cfg.data.img_size
-    dx = 1 / (Nx_f + 1)
-    points_x = np.linspace(-0.5 + dx, 0.5 - dx, Nx_f).T
+    N_pts = cfg.data.img_size
+    dx = 1 / (N_pts + 1)
+    points_x = np.linspace(-0.5 + dx, 0.5 - dx, N_pts).T
     xx, yy = np.meshgrid(points_x, points_x)
 
     cwd = os.getcwd()
