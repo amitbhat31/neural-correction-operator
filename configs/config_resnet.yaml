@@ -6,6 +6,7 @@ data:
   img_size: 64
   # circs or sl
   dataset_type: "circs"
+  bfgs_iters: 350
   noise_level: 0.0
   data_path: "path/to/your/data.npz"
 
@@ -23,6 +24,7 @@ training:
 model:
   name: "resNet"
   type: "ResNet18"
+  in_planes: 64
   in_channels: 1
   out_channels: 1
   output_res: 64
@@ -33,14 +35,14 @@ model:
 system:
   device: "cuda"
   cudnn_benchmark: true
-  num_workers: 4
+  num_workers: 1
 
 output:
   base_dir: "runs"
   logs_dir: "logs"
   figs_dir: "figs"
   models_dir: "mdls"
-  name_template: "ResNet_{dataset}_res_{img_size}_noise_{noise}_Ntr_{train_samples}"
+  name_template: "ResNet_{dataset}_bfgs_{bfgs_iters}_res_{img_size}_noise_{noise}_LR_{lr}_Ntr_{train_samples}"
 
 validation:
   enabled: true

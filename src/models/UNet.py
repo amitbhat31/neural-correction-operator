@@ -66,13 +66,23 @@ class UNet(nn.Module):
         x2 = self.trunk['down_groupnorm_2'](x2)
         x2 = self.act(x2)
 
+        x3 = self.trunk['down_conv_3'](x2)
+        x3 += self.trunk['down_fc_3'](embed)[..., None, None]
+        x3 = self.trunk['down_groupnorm_3'](x3)
+        x3 = self.act(x3)
+
         # mid layer
-        x_mid = self.trunk['mid_conv'](x2)
+        x_mid = self.trunk['mid_conv'](x3)
         x_mid += self.trunk['mid_fc'](embed)[..., None, None]
         x_mid = self.trunk['mid_groupnorm'](x_mid)
 
         # up layers
-        x_up = self.trunk['up_conv_2'](x_mid)
+        x_up = self.trunk['up_conv_3'](x_mid)
+        x_up += self.trunk['up_fc_3'](embed)[..., None, None]
+        x_up = self.trunk['up_groupnorm_3'](x_up)
+        x_up = self.act(x_up)
+
+        x_up = self.trunk['up_conv_2'](torch.cat([x_up, x2], dim=1))
         x_up += self.trunk['up_fc_2'](embed)[..., None, None]
         x_up = self.trunk['up_groupnorm_2'](x_up)
         x_up = self.act(x_up)

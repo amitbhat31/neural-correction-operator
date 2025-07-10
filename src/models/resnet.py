@@ -19,53 +19,53 @@ class BasicBlock(nn.Module):
                 nn.BatchNorm2d(self.expansion * planes)
             )
 
-    # def forward(self, x):
-    #     out = F.relu(self.bn1(self.conv1(x)))
-    #     out = self.bn2(self.conv2(out))
-    #     out += self.shortcut(x)
-    #     out = F.relu(out)
-    #     return out
-    
-    def forward(self, x): 
-        print("start block")
-        out = self.conv1(x)
-        print(f"conv1: {out.shape}")
-        out = self.bn1(out)
-        print(f"batchnorm1: {out.shape}")
-        out = F.relu(out)
-        print(f"relu1: {out.shape}")
-        out = self.conv2(out)
-        print(f"conv2: {out.shape}")
-        out = self.bn2(out)
-        print(f"batchnorm2: {out.shape}")
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
-        print(f"shortcut shape: {self.shortcut(x).shape}")
-        print(f"add skip: {out.shape}")
         out = F.relu(out)
-        print(f"relu2: {out.shape}")
         return out
+    
+    # def forward(self, x): 
+    #     print("start block")
+    #     out = self.conv1(x)
+    #     print(f"conv1: {out.shape}")
+    #     out = self.bn1(out)
+    #     print(f"batchnorm1: {out.shape}")
+    #     out = F.relu(out)
+    #     print(f"relu1: {out.shape}")
+    #     out = self.conv2(out)
+    #     print(f"conv2: {out.shape}")
+    #     out = self.bn2(out)
+    #     print(f"batchnorm2: {out.shape}")
+    #     out += self.shortcut(x)
+    #     print(f"shortcut shape: {self.shortcut(x).shape}")
+    #     print(f"add skip: {out.shape}")
+    #     out = F.relu(out)
+    #     print(f"relu2: {out.shape}")
+    #     return out
 
 
 class ResNet18(nn.Module):
-    def __init__(self, block=BasicBlock, num_blocks, in_channels=1, out_channels=1, output_res=64):
+    def __init__(self, config, block=BasicBlock):
         super(ResNet18, self).__init__()
 
-        conf = config.resnet
-        self.in_planes = 64
+        conf = config.model
+        self.in_planes = conf.in_planes
+        
 
 
-
-        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(conf.in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
+        self.layer1 = self._make_layer(block, 64, conf.num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 128, conf.num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, conf.num_blocks[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, conf.num_blocks[3], stride=2)
         
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.linear = nn.Linear(512, output_res * output_res)
+        self.linear = nn.Linear(512, conf.output_res * conf.output_res)
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1] * (num_blocks - 1)
