@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import functools
 
-from UNet import UNet
+from models.UNet import UNet
 from utils import *
 from ddpm_utils import *
 
@@ -84,9 +84,9 @@ def main(cfg: DictConfig):
     # Process UNet configuration
     unet_config = process_unet_config(cfg, cfg.model.c0, cfg.model.embed_dim)
     
-    # Create model
+    # Create model 
     if cfg.model.name == 'UNet':
-        model = UNet(cfg.ddpm.Nt, cfg.model.embed_dim, unet_config['down_config'], unet_config['up_config'], unet_config['mid_config']).to(device)
+        model = UNet(cfg, unet_config).to(device)
     else:
         raise ValueError(f"Unknown model name: {cfg.model.name}")
 

@@ -8,7 +8,7 @@ data:
   dataset_type: "circs"
   bfgs_iters: 350
   noise_level: 0.0
-  data_path: "path/to/your/data.npz"
+  data_path: "/blue/chunmei.wang/amit.bhat/my_score_sde/downscaling_DDPM/Generative-downsscaling-PDE-solvers/eit_data/eit_images_405_350.npz"
 
 training:
   num_epochs: 20000
@@ -31,32 +31,28 @@ model:
   name: "UNet"
   embed_dim: 256
   c0: 128
+  num_blocks: 3
   unet:
-    channel_multipliers:
-      down: [1, 2, 4, 8]
-      mid: [4]
-      up: [8, 4, 2, 1]
-    
     down_config_template:
       - [2, "c0", 9, 1, 4]
       - ["c0", "2*c0", 3, 2, 32]
       - ["2*c0", "4*c0", 3, 2, 32]
     
     mid_config_template:
-      - ["4*c0", "4*c0", 1, 1, "embed_dim"]
+      - ["4*c0", "4*c0", 1, 1, 32]
     
     up_config_template:
-      - ["4*c0", "2*c0", 3, 2, 32]
-      - ["2*c0+2*c0", "c0", 3, 2, 32]
+      - ["4*c0", "2*c0", 3, 2, 32, 0]
+      - ["2*c0+2*c0", "c0", 3, 2, 32, 1]
       - ["c0+c0", 1, 9, 1, 4]
 
 system:
   device: "cuda"
   cudnn_benchmark: true
-  num_workers: 4
+  num_workers: 1
 
 output:
-  base_dir: "runs"
+  base_dir: "/blue/chunmei.wang/amit.bhat/noc/runs"
   logs_dir: "logs"
   figs_dir: "figs"
   models_dir: "mdls"
