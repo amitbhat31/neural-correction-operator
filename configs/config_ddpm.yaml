@@ -4,8 +4,10 @@ data:
   val_samples: 100
   test_samples: 900
   img_size: 64
-  dataset_type: 0
-  noise_level: 0.05
+  # circs or sl
+  dataset_type: "circs"
+  bfgs_iters: 350
+  noise_level: 0.0
   data_path: "path/to/your/data.npz"
 
 training:
@@ -29,7 +31,6 @@ model:
   name: "UNet"
   embed_dim: 256
   c0: 128
-  
   unet:
     channel_multipliers:
       down: [1, 2, 4, 8]
@@ -37,19 +38,17 @@ model:
       up: [8, 4, 2, 1]
     
     down_config_template:
-      - [2, "c0", 9, 1, "embed_dim"]
-      - ["c0", "2*c0", 3, 2, "embed_dim"]
-      - ["2*c0", "4*c0", 3, 2, "embed_dim"]
-      - ["4*c0", "8*c0", 3, 2, "embed_dim"]
+      - [2, "c0", 9, 1, 4]
+      - ["c0", "2*c0", 3, 2, 32]
+      - ["2*c0", "4*c0", 3, 2, 32]
     
     mid_config_template:
       - ["4*c0", "4*c0", 1, 1, "embed_dim"]
     
     up_config_template:
-      - ["8*c0", "4*c0", 3, 2, "embed_dim"]
-      - ["4*c0", "2*c0", 3, 2, "embed_dim"]
-      - ["2*c0+2*c0", "c0", 3, 2, "embed_dim"]
-      - ["c0+c0", 1, 9, 1, "embed_dim"]
+      - ["4*c0", "2*c0", 3, 2, 32]
+      - ["2*c0+2*c0", "c0", 3, 2, 32]
+      - ["c0+c0", 1, 9, 1, 4]
 
 system:
   device: "cuda"
@@ -61,7 +60,7 @@ output:
   logs_dir: "logs"
   figs_dir: "figs"
   models_dir: "mdls"
-  name_template: "DDPM_{dataset}_res_{img_size}_noise_{noise}_Ntr_{train_samples}_maxLR_{lr_max}_minLR_{lr_min}_timesteps_{Nt}"
+  name_template: "DDPM_{dataset}_bfgs_{bfgs_iters}_res_{img_size}_noise_{noise}_Ntr_{train_samples}_maxLR_{lr_max}_minLR_{lr_min}_timesteps_{Nt}"
 
 validation:
   enabled: true

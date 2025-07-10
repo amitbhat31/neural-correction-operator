@@ -4,8 +4,9 @@ data:
   val_samples: 100
   test_samples: 900
   img_size: 64
-  dataset_type: 0
-  noise_level: 0.05
+  # circs or sl
+  dataset_type: "circs"
+  noise_level: 0.0
   data_path: "path/to/your/data.npz"
 
 training:

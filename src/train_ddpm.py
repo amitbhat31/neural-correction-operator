@@ -1,130 +1,138 @@
-import click
+import os
+import time
+import hydra
+from omegaconf import DictConfig
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from utils import *
-from utils_eit import *
 import functools
 
 from UNet import UNet
+from utils import *
+from ddpm_utils import *
 
-import os
 
+@hydra.main(config_path="../configs", config_name="config_ddpm")
+def main(cfg: DictConfig):
 
-@click.command()
-@click.option('--img-size', type=int, required=True, help='size of output image')
-@click.option('--dataset', type=int, required=True, help='name of dataset: 0:circs or 1:sl')
-@click.option('--noise', type=float, required=True, help='noise level')
-@click.option('--lr-max', type=float, required=True, help='maximal learning rate for cosine scheduler')
-@click.option('--lr-min', type=float, required=True, help='minimal learning rate for cosine scheduler')
-@click.option('--data-path', type=str, required=True, help='path to the data')
-def main(
-    img_size: int,
-    dataset: int,
-    noise: float,
-    lr_max: float,
-    lr_min: float,
-    data_path: str,
-):
-    # define grid
-    Nx_f = img_size
-    dx = 1 / (Nx_f + 1)
-    points_x = np.linspace(dx, 1 - dx, Nx_f).T
+    device = torch.device(cfg.system.device if torch.cuda.is_available() else "cpu")
+    
+    if cfg.reproducibility.seed is not None:
+        torch.manual_seed(cfg.reproducibility.seed)
+        np.random.seed(cfg.reproducibility.seed)
+    if cfg.reproducibility.deterministic:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    else:
+        torch.backends.cudnn.benchmark = cfg.system.cudnn_benchmark
+
+    # Define grid for plotting
+    N_pts = cfg.data.img_size
+    dx = 1 / (N_pts + 1)
+    points_x = np.linspace(-0.5 + dx, 0.5 - dx, N_pts).T
     xx, yy = np.meshgrid(points_x, points_x)
 
+
     cwd = os.getcwd()
-    print(cwd, flush=True)
+    print(f"Working directory: {cwd}", flush=True)
 
-    torch.backends.cudnn.benchmark = True
+    data_name = cfg.data.dataset_type
+    bfgs_iters = cfg.data.bfgs_iters
 
-    data_name = 'circs'
-    if dataset == 1:
-        data_name = 'sl'
+    save_name = cfg.output.name_template.format(
+        dataset=data_name,
+        bfgs_iters=bfgs_iters,
+        img_size=cfg.data.img_size,
+        noise=num2str_deciaml(cfg.data.noise_level),
+        train_samples=cfg.data.train_samples,
+        lr_max=num2str_deciaml(cfg.training.lr_max),
+        lr_min=num2str_deciaml(cfg.training.lr_min),
+        Nt=cfg.ddpm.Nt
+    )
+    print(f"Save name: {save_name}")
+
+
+    data = np.load(cfg.data.data_path)
+    imgs_true = data["imgs_true"][:cfg.data.total_samples, ...]
+    imgs_pred = data["imgs_pred"][:cfg.data.total_samples, ...]
+
+    imgs_true = torch.from_numpy(imgs_true).float().reshape(cfg.data.total_samples, cfg.data.img_size, cfg.data.img_size, 1)
+    imgs_pred = torch.from_numpy(imgs_pred).float().reshape(cfg.data.total_samples, cfg.data.img_size, cfg.data.img_size, 1)
+
+    print(f"Data shapes: {imgs_true.shape}, {imgs_pred.shape}", flush=True)
+
+    clip = torch.max(torch.abs(imgs_pred)) * cfg.ddpm.clip_coeff
     
-
-    save_name = 'DDPM_' + data_name + '_res_'+ str(img_size) + '_noise_' + num2str_deciaml(noise) + '_Ntr_' + str(Ntr) +  '_maxLR_' + num2str_deciaml(lr_max) + '_minLR_' + num2str_deciaml(lr_min) + '_timesteps_' + str(Nt)
-
-    print(save_name)
-
-    ### load training data ####
-    #convert numpy to torch
-    # npy_name = "/blue/chunmei.wang/amit.bhat/my_score_sde/downscaling_DDPM/Generative-downsscaling-PDE-solvers/eit_data/sl_images_5_150_n_05.npz"
-    # npy_name = "/blue/chunmei.wang/amit.bhat/my_score_sde/downscaling_DDPM/Generative-downsscaling-PDE-solvers/eit_data/eit_images_405_350.npz"
-    data = np.load(data_path)
-
-    imgs_true = data["imgs_true"][:Nim, ...]
-    imgs_pred = data["imgs_pred"][:Nim, ...]
-
-
-    imgs_true = torch.from_numpy(imgs_true).float().reshape(Nim, 64, 64, 1)
-    imgs_pred = torch.from_numpy(imgs_pred).float().reshape(Nim, 64, 64, 1)
-
-    
-    print(imgs_true.shape, imgs_pred.shape, flush=True)
-
-    clip = torch.max(torch.abs(imgs_pred)) * clip_coeff
-    
-    # this is fine
+    # Create training dataset
     dataset = []
-    for i in range(Ntr):
-        #contains u_c and u_f
+    for i in range(cfg.data.train_samples):
         tmp_ls = []
         tmp_ls.append(imgs_true[i, ...])
         tmp_ls.append(imgs_pred[i, ...])
-        
         dataset.append(tmp_ls)
     
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    data_loader = DataLoader(dataset, batch_size=cfg.training.batch_size, shuffle=True, num_workers=cfg.system.num_workers)
 
-    content = 'loaded training data'
-    print(content, flush=True)
+    print('Loaded training data', flush=True)
     
-    
-#     insert testing data here
-# slice original eit_images file in train/test/val; may need to include 
-    test_c, test_f = imgs_pred[Ntr:Ntr+Nval, ...], imgs_true[Ntr:Ntr+Nval, ...]
+    # Create validation/test data
+    val_pred = imgs_pred[cfg.data.train_samples:cfg.data.train_samples+cfg.data.val_samples, ...]
+    val_true = imgs_true[cfg.data.train_samples:cfg.data.train_samples+cfg.data.val_samples, ...]
+    print(f"Test data shapes: {val_pred.shape}, {val_true.shape}", flush=True)
 
-    print(test_c.shape, test_f.shape, flush=True)
+    # Process UNet configuration
+    unet_config = process_unet_config(cfg, cfg.model.c0, cfg.model.embed_dim)
     
-
-    if model_name=='UNet':
-        model = UNet(Nt, embed_dim, Down_config, Up_config, Mid_config).to(device)
-    elif model_name == 'UNet_attn':
-        model = UNet_attn(Nt, embed_dim, Down_config, Up_config, Mid_config).to(device)
+    # Create model
+    if cfg.model.name == 'UNet':
+        model = UNet(cfg.ddpm.Nt, cfg.model.embed_dim, unet_config['down_config'], unet_config['up_config'], unet_config['mid_config']).to(device)
+    else:
+        raise ValueError(f"Unknown model name: {cfg.model.name}")
 
     model_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print('UNet num of parameters', model_trainable_params, flush=True)
+    print(f'{cfg.model.name} number of parameters: {model_trainable_params}', flush=True)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr_max)
-    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.75)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epoch, eta_min=lr_min)
+    # Setup optimizer and scheduler
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training.lr_max)
     
-     ### define diffusion parameters ##################################################
-    betas, alphas, alphas_bar, alphas_bar_sqrt, one_minus_alphas_bar_sqrt, sigma = get_parameters(beta_start, beta_end, Nt)
+    if cfg.training.scheduler == "cosine_annealing":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.training.num_epochs, eta_min=cfg.training.lr_min)
+    else:
+        raise ValueError(f"Unknown scheduler: {cfg.training.scheduler}")
+    
+    # Define diffusion parameters
+    betas, alphas, alphas_bar, alphas_bar_sqrt, one_minus_alphas_bar_sqrt, sigma = get_parameters(
+        cfg.ddpm.beta_start, cfg.ddpm.beta_end, cfg.ddpm.Nt
+    )
 
-    # L_f = get_L(Nx_f, dim=2)
-    # myfunc_f, myjac_f = functools.partial(myfunc, L_f, d0, d1), functools.partial(myjac, L_f, d0, d1)
-    ################################################################################################
-    log_name = cwd + '/runs/logs/' + save_name + '_log.txt'
-    fig_name = cwd + '/runs/figs/' + save_name
-    chkpts_name = cwd + '/runs/mdls/' + save_name
+    # Setup logging and output paths
+    log_name = os.path.join(cwd, cfg.output.base_dir, cfg.output.logs_dir, f"{save_name}_log.txt")
+    fig_name = os.path.join(cwd, cfg.output.base_dir, cfg.output.figs_dir, save_name)
+    chkpts_name = os.path.join(cwd, cfg.output.base_dir, cfg.output.models_dir, save_name)
 
-    print(log_name, fig_name, chkpts_name, flush=True)
+    # Create directories if they don't exist
+    os.makedirs(os.path.dirname(log_name), exist_ok=True)
+    os.makedirs(os.path.dirname(fig_name), exist_ok=True)
+    os.makedirs(os.path.dirname(chkpts_name), exist_ok=True)
+
+    print(f"Log: {log_name}")
+    print(f"Figs: {fig_name}")
+    print(f"Checkpoints: {chkpts_name}", flush=True)
 
     content = 'start training'
     mylogger(log_name, content)
     
-    ### training loop
+    # Training loop
     tic = time.time()
-    for k in range(num_epoch+1):
+    for k in range(cfg.training.num_epochs + 1):
         model.train()
         for data in data_loader: 
-            x, x_c = data[0], data[1]
-            x, x_c = x.to(device), x_c.to(device)
+            x, x_hat = data[0], data[1]
+            x, x_hat = x.to(device), x_hat.to(device)
 
-            #have to rewrite loss function
-            loss = get_loss(model, alphas_bar_sqrt, one_minus_alphas_bar_sqrt, Nt, x, x_c)
+            # Calculate loss
+            loss = get_loss(model, alphas_bar_sqrt, one_minus_alphas_bar_sqrt, cfg.ddpm.Nt, x, x_hat)
 
             optimizer.zero_grad()
             loss.backward()
@@ -132,49 +140,39 @@ def main(
 
             scheduler.step()
         
-        if k % record_epoch == 0 and k>0:
+        if k % cfg.training.record_epoch == 0 and k > 0:
             model.eval()
-            ### record time and loss ###
+            # Record time and loss
             elapsed_time = time.time() - tic
-            content = 'at epoch %d the total training time is %3f and the empirical loss is: %3f' % (k, elapsed_time, loss)
+            content = f'at epoch {k} the total training time is {elapsed_time:.3f} and the empirical loss is: {loss:.3f}'
             print(content, flush=True)
             mylogger(log_name, content)
             
-            #insert validation here by solving at intermediate ddpm step
-        
-            pd, Process = solver_ddpm(model, clip, sigma, alphas, one_minus_alphas_bar_sqrt, Nt, test_c[..., [0]])
+            # Validation step
+            if cfg.validation.enabled:
+                pd, Process = solver_ddpm(model, clip, sigma, alphas, one_minus_alphas_bar_sqrt, cfg.ddpm.Nt, val_pred[..., [0]])
 
-            get_plot_sample_ddpm(Nt, xx, yy, Process, pd, test_c, test_f, fig_name, k)
+                get_plot_sample_ddpm(cfg.ddpm.Nt, xx, yy, Process, pd, val_pred, val_true, fig_name, k)
 
-            error_pd = myRL2_np(tensor2nump(test_f), pd)
-            error_c = myRL2_np(tensor2nump(test_f), tensor2nump(test_c))
-            error_f = myRL2_np(tensor2nump(test_f), tensor2nump(test_f))
+                error_pd = myRL2_np(tensor2nump(val_true), pd)
+                content = f'at step: {k}, Relative L2 error of ddpm is: {error_pd:.3f}'
 
-            content = 'at step: %d, Relative L2 error of coarse solver is: %3f, fine solver is: %3f, ddim is: %3f' % (
-                k, error_c, error_f,  error_pd)
-
-            mylogger(log_name, content)
-
-            print(content, flush=True)
+                mylogger(log_name, content)
+                print(content, flush=True)
             
-            if k%2000 == 0:
-                ### save model ###
+            # Save checkpoint
+            if cfg.checkpoint.save and k % cfg.training.save_frequency == 0:
                 current_lr = scheduler.get_last_lr()[0]
                 checkpoint = {
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'scheduler_state_dict': scheduler.state_dict(),  # Saving scheduler state is optional but can be useful
+                    'scheduler_state_dict': scheduler.state_dict(),
                     'current_lr': current_lr,
-                    'epoch': k,  # Optional, add if you want to keep track of epochs
+                    'epoch': k,
                     'loss': loss,
-                    # ... include any other things you want to save
+                    'config': cfg,
                 }
-                torch.save(checkpoint, chkpts_name +'_'+ str(k) + '.pth')
-        
+                torch.save(checkpoint, f"{chkpts_name}_{k}.pth")
 
 if __name__ == "__main__":
-    main()
-
-        
-    
-    
+    main() 

@@ -9,20 +9,17 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class UNet(nn.Module):
 
-    def __init__(self, config):
+    def __init__(self, config, unet_config):
         # comments here
 
         super().__init__()
 
-        conf = config.ddpm
-        self.nT = config.nT
+        self.Nt = config.Nt
         #extract config params
-
-       
-
-        down = conf.down
-        mid = conf.mid
-        up = conf.up
+        embed_dim = config.model.embed_dim
+        down = unet_config['down_config']
+        mid = unet_config['mid_config']
+        up = unet_config['up_config']
         
         self.time_embed = nn.Sequential(TimeEmbedding(embed_dim=embed_dim), nn.Linear(embed_dim, embed_dim))
 

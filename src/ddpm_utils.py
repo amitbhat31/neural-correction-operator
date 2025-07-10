@@ -38,6 +38,34 @@ def myRL2_np(a, b):
     error = np.mean( np.sqrt( np.sum((a-b)**2, axis=(1, 2, 3)) / np.sum((a)**2, axis=(1, 2, 3)) ) )
     return error
 
+def process_unet_config(config, c0, embed_dim):
+    """
+    Process UNet configuration templates by substituting c0 and embed_dim values.
+    """
+    def process_layer_config(layer_config_template):
+        processed_config = []
+        for layer in layer_config_template:
+            processed_layer = []
+            for param in layer:
+                if isinstance(param, str):
+                    param = param.replace("c0", str(c0))
+                    param = param.replace("embed_dim", str(embed_dim))
+                    if "*" in param or "+" in param:
+                        param = eval(param)
+                    else:
+                        param = int(param)
+                processed_layer.append(param)
+            processed_config.append(tuple(processed_layer))
+        return processed_config
+    
+    unet_config = {
+        'down_config': process_layer_config(config.model.unet.down_config_template),
+        'mid_config': process_layer_config(config.model.unet.mid_config_template),
+        'up_config': process_layer_config(config.model.unet.up_config_template)
+    }
+    
+    return unet_config
+
 #downsample dtn
 def downsample_dtn_data(x,v_h):
     
