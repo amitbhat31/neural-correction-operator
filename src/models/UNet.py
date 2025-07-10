@@ -39,7 +39,7 @@ class UNet(nn.Module):
             self.trunk[f'up_fc_{b}'] = nn.Linear(embed_dim, up[i][1])
             self.trunk[f'up_groupnorm_{b}'] = nn.GroupNorm(up[i][4], num_channels = up[i][1])
         
-        self.trunk['up_conv_0'] = nn.ConvTranspose2d(up[2][0], up[2][1], kernel_size=up[2][2], stride=up[2][3])
+        self.trunk['up_conv_0'] = nn.ConvTranspose2d(up[config.model.num_blocks-1][0], up[config.model.num_blocks-1][1], kernel_size=up[config.model.num_blocks-1][2], stride=up[config.model.num_blocks-1][3])
 
         self.act = nn.ReLU()
 
@@ -87,14 +87,17 @@ class UNet(nn.Module):
         x_up = self.trunk['up_groupnorm_2'](x_up)
         x_up = self.act(x_up)
 
-        x_up = self.trunk['up_conv_1'](torch.cat([x_up, x1], dim=1))
+        x_up = torch.cat([x_up, x1], dim=1)
+        x_up = self.trunk['up_conv_1'](x_up)
         x_up += self.trunk['up_fc_1'](embed)[..., None, None]
         x_up = self.trunk['up_groupnorm_1'](x_up)
         x_up = self.act(x_up)
 
-        x_up = self.trunk['up_conv_0'](torch.cat([x_up, x0], dim=1))
-        
-        return x_up.permute(0, 2, 3, 1)
+        x_up = torch.cat([x_up, x0], dim=1)
+        x_up = self.trunk['up_conv_0'](x_up)
+
+        x_up = x_up.permute(0, 2, 3, 1)
+        return x_up
     
 class TimeEmbedding(nn.Module):
 

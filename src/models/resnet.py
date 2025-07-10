@@ -76,51 +76,24 @@ class ResNet18(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        print(x.shape)        
         x = x.permute(0, 3, 1, 2) 
-        print(x.shape)
 
-        # x = F.relu(self.bn1(self.conv1(x)))
-        
         x = self.conv1(x)
-        print(x.shape)
         x = self.bn1(x)
-        print(x.shape)
         x = F.relu(x)
-        print(x.shape)
         x = self.maxpool(x)
-        print(f"maxpool: {x.shape}")
-        print()
-        
+
         x = self.layer1(x)
-        print(f"fin block1: {x.shape}")
-        print()
         x = self.layer2(x)
-        print(f"fin block2: {x.shape}")
-        print()
         x = self.layer3(x)
-        print(f"fin block3: {x.shape}")
-        print()
         x = self.layer4(x)
-        print(f"fin block4: {x.shape}")
-        print()
-        
+
         x = self.avgpool(x)
-        print(f"avgpool: {x.shape}")
         x = torch.flatten(x, start_dim=1) 
-        print(f"flatten: {x.shape}")
         x = self.linear(x)
-        print(f"linear: {x.shape}")
 
-
-        print(x.shape, flush=True)
-        
-        # x = x.unsqueeze(1) 
         x = x.view(x.size(0), 1, 64, 64) 
-        print(x.shape)
-
         x = x.permute(0, 2, 3, 1) 
-        print(x.shape, flush=True)
         return x
 
 

@@ -126,7 +126,7 @@ def main(cfg: DictConfig):
             x, x_hat = x.to(device), x_hat.to(device)
 
             # Calculate loss
-            loss = myL2L(x, model(x, x_hat))
+            loss = myL2L(x, model(x_hat))
 
             optimizer.zero_grad()
             loss.backward()
@@ -149,7 +149,7 @@ def main(cfg: DictConfig):
                     for data in val_loader:
                         x, x_hat = data[0], data[1]  # x is fine solution, x_hat is coarse solution
                         x, x_hat = x.to(device), x_hat.to(device)
-                        outputs = model(x, x_hat)
+                        outputs = model(x_hat)
                         loss_val = myL2L(x, outputs)
                         val_loss += loss_val.item()
                     avg_loss = val_loss / len(val_loader)
@@ -160,7 +160,7 @@ def main(cfg: DictConfig):
                 data_1 = next(iter(val_loader))
                 x, x_hat = data_1[0], data_1[1]  # x is fine solution, x_hat is coarse solution
                 x, x_hat = x.to(device), x_hat.to(device)
-                x_pred = model(x, x_hat)
+                x_pred = model(x_hat)
 
                 plot_resnet_results(xx, yy, x_hat, x, x_pred, fig_name, k)
             
