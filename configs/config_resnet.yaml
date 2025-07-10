@@ -1,0 +1,60 @@
+data:
+  total_samples: 5000
+  train_samples: 4000
+  val_samples: 100
+  test_samples: 900
+  img_size: 64
+  dataset_type: 0
+  noise_level: 0.05
+  data_path: "path/to/your/data.npz"
+
+training:
+  num_epochs: 20000
+  record_epoch: 400
+  save_frequency: 4000
+  batch_size: 128
+  lr: 0.001
+  optimizer: "adam"
+  scheduler: "step"
+  scheduler_step_size: 500
+  scheduler_gamma: 0.75
+
+model:
+  name: "resNet"
+  type: "ResNet18"
+  in_channels: 1
+  out_channels: 1
+  output_res: 64
+  num_blocks: [2, 2, 2, 2]
+  embed_dim: 256
+  gn: 32
+
+system:
+  device: "cuda"
+  cudnn_benchmark: true
+  num_workers: 4
+
+output:
+  base_dir: "runs"
+  logs_dir: "logs"
+  figs_dir: "figs"
+  models_dir: "mdls"
+  name_template: "ResNet_{dataset}_res_{img_size}_noise_{noise}_Ntr_{train_samples}"
+
+validation:
+  enabled: true
+  frequency: 400
+  metrics:
+    - "mse"
+    - "relative_l2_error"
+
+checkpoint:
+  save: true
+  load: false
+  path: null
+  save_optimizer: true
+  save_scheduler: true
+
+reproducibility:
+  seed: 42
+  deterministic: false 

@@ -7,10 +7,10 @@ from utils import *
 from utils_eit import *
 import functools
 
-from Net_2D_eit import UNet, UNet_attn
+from UNet import UNet
 
 import os
-from configs.config_eit import *
+
 
 @click.command()
 @click.option('--img-size', type=int, required=True, help='size of output image')
