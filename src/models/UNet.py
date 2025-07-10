@@ -28,7 +28,6 @@ class UNet(nn.Module):
 
         self.trunk = nn.ModuleDict()
 
-
         for b in range(conf.num_blocks):
             self.trunk[f'down_conv_{b}'] = nn.Conv2d(down[b][0], down[b][1], kernel_size=down[b][2], stride=down[b][3], bias=False)
             self.trunk[f'down_fc_{b}'] = nn.Linear(embed_dim, down[b][1])

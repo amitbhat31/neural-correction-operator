@@ -76,12 +76,10 @@ class ResNet18(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        print("pass in data, grr")
-        print(x.shape)
+        print(x.shape)        
         x = x.permute(0, 3, 1, 2) 
         print(x.shape)
 
-        print("machine magically learns, dw")
         # x = F.relu(self.bn1(self.conv1(x)))
         
         x = self.conv1(x)
@@ -115,7 +113,6 @@ class ResNet18(nn.Module):
         print(f"linear: {x.shape}")
 
 
-        print("calculate loss, machine learned, yay")
         print(x.shape, flush=True)
         
         # x = x.unsqueeze(1) 
@@ -124,7 +121,6 @@ class ResNet18(nn.Module):
 
         x = x.permute(0, 2, 3, 1) 
         print(x.shape, flush=True)
-        print("done")
         return x
 
 
