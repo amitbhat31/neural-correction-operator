@@ -26,6 +26,7 @@ class UNet(nn.Module):
         self.trunk = nn.ModuleDict()
 
         for b in range(config.model.num_blocks):
+            print(b, down[b])
             self.trunk[f'down_conv_{b}'] = nn.Conv2d(down[b][0], down[b][1], kernel_size=down[b][2], stride=down[b][3], bias=False)
             self.trunk[f'down_fc_{b}'] = nn.Linear(embed_dim, down[b][1])
             self.trunk[f'down_groupnorm_{b}'] = nn.GroupNorm(down[b][4], num_channels = down[b][1])
@@ -35,13 +36,14 @@ class UNet(nn.Module):
         self.trunk[f'mid_groupnorm'] = nn.GroupNorm(mid[0][4], num_channels = mid[0][1])
 
         for b, i in zip(range(config.model.num_blocks-1, 0, -1), range(config.model.num_blocks-1)):
+            print(b, i, up[i])
             self.trunk[f'up_conv_{b}'] = nn.ConvTranspose2d(up[i][0], up[i][1], kernel_size=up[i][2], stride=up[i][3], output_padding=up[i][5], bias=False)
             self.trunk[f'up_fc_{b}'] = nn.Linear(embed_dim, up[i][1])
             self.trunk[f'up_groupnorm_{b}'] = nn.GroupNorm(up[i][4], num_channels = up[i][1])
         
         self.trunk['up_conv_0'] = nn.ConvTranspose2d(up[config.model.num_blocks-1][0], up[config.model.num_blocks-1][1], kernel_size=up[config.model.num_blocks-1][2], stride=up[config.model.num_blocks-1][3])
 
-        self.act = nn.ReLU()
+        self.act = lambda x: x * torch.sigmoid(x)
 
     def forward(self, x, x_hat, t):
 
@@ -75,6 +77,7 @@ class UNet(nn.Module):
         x_mid = self.trunk['mid_conv'](x3)
         x_mid += self.trunk['mid_fc'](embed)[..., None, None]
         x_mid = self.trunk['mid_groupnorm'](x_mid)
+        x_mid = self.act(x_mid)
 
         # up layers
         x_up = self.trunk['up_conv_3'](x_mid)
@@ -82,7 +85,8 @@ class UNet(nn.Module):
         x_up = self.trunk['up_groupnorm_3'](x_up)
         x_up = self.act(x_up)
 
-        x_up = self.trunk['up_conv_2'](torch.cat([x_up, x2], dim=1))
+        x_up = torch.cat([x_up, x2], dim=1)
+        x_up = self.trunk['up_conv_2'](x_up)
         x_up += self.trunk['up_fc_2'](embed)[..., None, None]
         x_up = self.trunk['up_groupnorm_2'](x_up)
         x_up = self.act(x_up)

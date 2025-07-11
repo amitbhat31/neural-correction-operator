@@ -6,10 +6,11 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import os
 import time
+import scipy.io as sio
+import matplotlib.tri as tri
+
 from utils import *
 from ddpm_utils import *
-
-# Import the ResNet model
 from models.resnet import ResNet18, BasicBlock
 
 @hydra.main(config_path="../configs", config_name="config_resnet")
@@ -179,7 +180,7 @@ def main(cfg: DictConfig):
                 x, x_hat = x.to(device), x_hat.to(device)
                 x_pred = model(x_hat)
 
-                plot_resnet_results(xx, yy, GCOORD, x_hat, x, x_pred, fig_name, k, centroids, triangulation)
+                plot_resnet_results(cfg, xx, yy, GCOORD, x_hat, x, x_pred, fig_name, k, centroids, triangulation)
             
             # Save checkpoint
             if cfg.checkpoint.save and k % cfg.training.save_frequency == 0:

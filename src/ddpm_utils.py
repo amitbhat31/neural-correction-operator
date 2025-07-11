@@ -11,6 +11,7 @@ from scipy import sparse
 from utils import *
 
 from data.fem import Mesh, V_h, dtn_map
+from data.utils import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -288,17 +289,21 @@ def get_plot_sample_ddpm(config, Nt, xx, yy, GCOORD, Process, pd, test_hat, test
 
     fig2, ax = plt.subplots(2, 2, figsize=(8, 8))
     ax[0, 0].tripcolor(triangulation, curr_hat, edgecolors='none')
+    ax[0, 0].axis('off')
     ax[0, 0].set_title('x_hat')
 
     cp = ax[0, 1].tripcolor(triangulation, curr_true, edgecolors='none')
+    ax[0, 1].axis('off')
     ax[0, 1].set_title('x_true')
     plt.colorbar(cp)
 
     cp = ax[1, 0].tripcolor(triangulation, curr_ddpm, edgecolors='none')
+    ax[1, 0].axis('off')
     ax[1, 0].set_title('x_pred')
     plt.colorbar(cp)
 
     cp = ax[1, 1].tripcolor(triangulation, np.abs(curr_ddpm - curr_true), edgecolors='none')
+    ax[1, 1].axis('off')
     ax[1, 1].set_title('error')
     plt.colorbar(cp)
     fig2.savefig(fig_name + '_epoch_step_' + str(step) + '_pd.jpg')
@@ -337,21 +342,25 @@ def plot_resnet_results(config, xx, yy, GCOORD, x_hat, x_true, x_pred, fig_name,
     
     # Plot coarse solution
     cp1 = ax[0, 0].tripcolor(triangulation, curr_hat, edgecolors='none')
+    ax[0, 0].axis('off')
     ax[0, 0].set_title('Coarse Solution')
     plt.colorbar(cp1, ax=ax[0, 0])
     
     # Plot fine solution (ground truth)
     cp2 = ax[0, 1].tripcolor(triangulation, curr_true, edgecolors='none')
+    ax[0, 1].axis('off')
     ax[0, 1].set_title('Fine Solution (Ground Truth)')
     plt.colorbar(cp2, ax=ax[0, 1])
     
     # Plot predicted solution
     cp3 = ax[1, 0].tripcolor(triangulation, curr_pred, edgecolors='none')
+    ax[1, 0].axis('off')
     ax[1, 0].set_title('ResNet Prediction')
     plt.colorbar(cp3, ax=ax[1, 0])
     
     # Plot error
     cp4 = ax[1, 1].tripcolor(triangulation, error, edgecolors='none')
+    ax[1, 1].axis('off')
     ax[1, 1].set_title('Absolute Error')
     plt.colorbar(cp4, ax=ax[1, 1])
     
