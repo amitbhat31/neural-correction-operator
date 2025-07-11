@@ -256,14 +256,19 @@ def sample_backward_loop_ddpm(model, clip, sigma, alphas, one_minus_alphas_bar_s
 
     return x_seq
 
-def get_plot_sample_ddpm(Nt, xx, yy, Process, pd, test_c, test_f, fig_name, step):
+def get_plot_sample_ddpm(config, Nt, xx, yy, GCOORD, Process, pd, test_hat, test_true, fig_name, step, centroids, triangulation):
     idx = 0
 
-    md_c = max_grad(test_c[idx, ..., 0])
-    md_f = max_grad(test_f[idx, ..., 0])
-    md_p = max_grad(Process[idx][-1, ..., 0])
+    md_hat = max_grad(test_hat[idx, ..., 0])
+    md_true = max_grad(test_true[idx, ..., 0])
+    md_ddpm = max_grad(Process[idx][-1, ..., 0])
 
-    print('max grad', md_c, md_f, md_p)
+    curr_hat = interpolate_pts(GCOORD, test_hat[idx, ..., 0].detach().cpu().numpy().flatten(), centroids)
+    curr_true = interpolate_pts(GCOORD, test_true[idx, ..., 0].detach().cpu().numpy().flatten(), centroids)
+    curr_ddpm = interpolate_pts(GCOORD, pd[idx, ..., 0].flatten(), centroids)
+    print("interpolated shapes", curr_hat.shape, curr_true.shape, curr_ddpm.shape)
+
+    print('max grad', md_hat, md_true, md_ddpm)
 
     fig, ax = plt.subplots(1, 11, figsize=(20, 3))
 
@@ -282,18 +287,18 @@ def get_plot_sample_ddpm(Nt, xx, yy, Process, pd, test_c, test_f, fig_name, step
     fig.savefig(fig_name + '_epoch_step_' + str(step) + '_generate.jpg')
 
     fig2, ax = plt.subplots(2, 2, figsize=(8, 8))
-    ax[0, 0].contourf(xx, yy, test_c[idx, ..., 0].detach().cpu().numpy(), 36, cmap=cm.jet)
-    ax[0, 0].set_title('uc')
+    ax[0, 0].tripcolor(triangulation, curr_hat, edgecolors='none')
+    ax[0, 0].set_title('x_hat')
 
-    cp = ax[0, 1].contourf(xx, yy, test_f[idx, ..., 0].detach().cpu().numpy(), 36, cmap=cm.jet)
-    ax[0, 1].set_title('uf')
+    cp = ax[0, 1].tripcolor(triangulation, curr_true, edgecolors='none')
+    ax[0, 1].set_title('x_true')
     plt.colorbar(cp)
 
-    cp = ax[1, 0].contourf(xx, yy, pd[idx, ..., 0], 36, cmap=cm.jet)
-    ax[1, 0].set_title('u pd')
+    cp = ax[1, 0].tripcolor(triangulation, curr_ddpm, edgecolors='none')
+    ax[1, 0].set_title('x_pred')
     plt.colorbar(cp)
 
-    cp = ax[1, 1].contourf(xx, yy, np.abs(pd[idx, ..., 0] - test_f[idx, ..., 0].detach().cpu().numpy()), 36, cmap=cm.jet)
+    cp = ax[1, 1].tripcolor(triangulation, np.abs(curr_ddpm - curr_true), edgecolors='none')
     ax[1, 1].set_title('error')
     plt.colorbar(cp)
     fig2.savefig(fig_name + '_epoch_step_' + str(step) + '_pd.jpg')
@@ -317,37 +322,36 @@ def max_grad(f):
 
     return max_d
 
-def plot_resnet_results(xx, yy, u_c, u_f, u_pred, fig_name, step):
+def plot_resnet_results(config, xx, yy, GCOORD, x_hat, x_true, x_pred, fig_name, step, centroids, triangulation):
     idx = 0
-    
-    # Convert tensors to numpy arrays if they aren't already
-    u_c_np = u_c[idx, ..., 0].detach().cpu().numpy()
-    u_f_np = u_f[idx, ..., 0].detach().cpu().numpy()
-    u_pred_np = u_pred[idx, ..., 0].detach().cpu().numpy()
+
+    curr_hat = interpolate_pts(GCOORD, x_hat[idx, ..., 0].detach().cpu().numpy().flatten(), centroids)
+    curr_true = interpolate_pts(GCOORD, x_true[idx, ..., 0].detach().cpu().numpy().flatten(), centroids)
+    curr_pred = interpolate_pts(GCOORD, x_pred[idx, ..., 0].detach().cpu().numpy().flatten(), centroids)
     
     # Calculate error
-    error = np.abs(u_pred_np - u_f_np)
+    error = np.abs(curr_pred - curr_true)
     
     # Create figure with 2x2 subplots
     fig, ax = plt.subplots(2, 2, figsize=(8, 8))
     
     # Plot coarse solution
-    cp1 = ax[0, 0].contourf(xx, yy, u_c_np, 36, cmap=cm.jet)
+    cp1 = ax[0, 0].tripcolor(triangulation, curr_hat, edgecolors='none')
     ax[0, 0].set_title('Coarse Solution')
     plt.colorbar(cp1, ax=ax[0, 0])
     
     # Plot fine solution (ground truth)
-    cp2 = ax[0, 1].contourf(xx, yy, u_f_np, 36, cmap=cm.jet)
+    cp2 = ax[0, 1].tripcolor(triangulation, curr_true, edgecolors='none')
     ax[0, 1].set_title('Fine Solution (Ground Truth)')
     plt.colorbar(cp2, ax=ax[0, 1])
     
     # Plot predicted solution
-    cp3 = ax[1, 0].contourf(xx, yy, u_pred_np, 36, cmap=cm.jet)
+    cp3 = ax[1, 0].tripcolor(triangulation, curr_pred, edgecolors='none')
     ax[1, 0].set_title('ResNet Prediction')
     plt.colorbar(cp3, ax=ax[1, 0])
     
     # Plot error
-    cp4 = ax[1, 1].contourf(xx, yy, error, 36, cmap=cm.jet)
+    cp4 = ax[1, 1].tripcolor(triangulation, error, edgecolors='none')
     ax[1, 1].set_title('Absolute Error')
     plt.colorbar(cp4, ax=ax[1, 1])
     

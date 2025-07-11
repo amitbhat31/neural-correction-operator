@@ -25,11 +25,28 @@ def main(cfg: DictConfig):
     else:
         torch.backends.cudnn.benchmark = cfg.system.cudnn_benchmark
 
-    # Define grid - spanning [-0.5, 0.5] × [-0.5, 0.5]
+    # Define grids for plotting and interpolation
     N_pts = cfg.data.img_size
-    dx = 1 / (N_pts + 1)
-    points_x = np.linspace(-0.5 + dx, 0.5 - dx, N_pts).T
-    xx, yy = np.meshgrid(points_x, points_x)
+    lx, ly = cfg.data.lx, cfg.data.ly
+    points_x = np.linspace(-lx/2, lx/2, N_pts)
+    points_y = np.linspace(-ly/2, ly/2, N_pts)
+    xx, yy = np.meshgrid(points_x, points_y)
+
+    GCOORD = np.vstack([xx.ravel(), yy.ravel()]).T
+    GCOORD = GCOORD.reshape((N_pts, N_pts, 2))
+    GCOORD = np.flip(GCOORD, axis=0)
+    GCOORD = GCOORD.reshape((-1, 2))
+    print("GCOORD shape", GCOORD.shape)
+    
+
+    # loading the file containing the mesh
+    mat_fname  = cfg.data.mesh_path
+    mat_contents = sio.loadmat(mat_fname)
+
+    p = mat_contents['p']
+    t = mat_contents['t']-1 # all the indices should be reduced by one
+    centroids = np.mean(p[t], axis=1)
+    triangulation = tri.Triangulation(p[:,0], p[:,1], t)
 
     cwd = os.getcwd()
     print(f"Working directory: {cwd}", flush=True)
@@ -158,11 +175,11 @@ def main(cfg: DictConfig):
 
                 # Plot sample results
                 data_1 = next(iter(val_loader))
-                x, x_hat = data_1[0], data_1[1]  # x is fine solution, x_hat is coarse solution
+                x, x_hat = data_1[0], data_1[1] 
                 x, x_hat = x.to(device), x_hat.to(device)
                 x_pred = model(x_hat)
 
-                plot_resnet_results(xx, yy, x_hat, x, x_pred, fig_name, k)
+                plot_resnet_results(xx, yy, GCOORD, x_hat, x, x_pred, fig_name, k, centroids, triangulation)
             
             # Save checkpoint
             if cfg.checkpoint.save and k % cfg.training.save_frequency == 0:

@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import functools
+import scipy.io as sio
+import matplotlib.tri as tri
 
 from models.UNet import UNet
 from utils import *
@@ -27,11 +29,28 @@ def main(cfg: DictConfig):
     else:
         torch.backends.cudnn.benchmark = cfg.system.cudnn_benchmark
 
-    # Define grid for plotting
+    # Define grids for plotting and interpolation
     N_pts = cfg.data.img_size
-    dx = 1 / (N_pts + 1)
-    points_x = np.linspace(-0.5 + dx, 0.5 - dx, N_pts).T
-    xx, yy = np.meshgrid(points_x, points_x)
+    lx, ly = cfg.data.lx, cfg.data.ly
+    points_x = np.linspace(-lx/2, lx/2, N_pts)
+    points_y = np.linspace(-ly/2, ly/2, N_pts)
+    xx, yy = np.meshgrid(points_x, points_y)
+
+    GCOORD = np.vstack([xx.ravel(), yy.ravel()]).T
+    GCOORD = GCOORD.reshape((N_pts, N_pts, 2))
+    GCOORD = np.flip(GCOORD, axis=0)
+    GCOORD = GCOORD.reshape((-1, 2))
+    print("GCOORD shape", GCOORD.shape)
+    
+
+    # loading the file containing the mesh
+    mat_fname  = cfg.data.mesh_path
+    mat_contents = sio.loadmat(mat_fname)
+
+    p = mat_contents['p']
+    t = mat_contents['t']-1 # all the indices should be reduced by one
+    centroids = np.mean(p[t], axis=1)
+    triangulation = tri.Triangulation(p[:,0], p[:,1], t)
 
 
     cwd = os.getcwd()
@@ -152,7 +171,7 @@ def main(cfg: DictConfig):
             if cfg.validation.enabled:
                 pd, Process = solver_ddpm(model, clip, sigma, alphas, one_minus_alphas_bar_sqrt, cfg.ddpm.Nt, val_pred[..., [0]])
 
-                get_plot_sample_ddpm(cfg.ddpm.Nt, xx, yy, Process, pd, val_pred, val_true, fig_name, k)
+                get_plot_sample_ddpm(cfg, cfg.ddpm.Nt, xx, yy,  GCOORD, Process, pd, val_pred, val_true, fig_name, k, centroids, triangulation)
 
                 error_pd = myRL2_np(tensor2nump(val_true), pd)
                 content = f'at step: {k}, Relative L2 error of ddpm is: {error_pd:.3f}'
