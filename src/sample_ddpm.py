@@ -44,7 +44,7 @@ def main(cfg: DictConfig):
     
     print(f"Samples path: {samples_path}")
 
-    data = np.load(cfg.sampling.data_path)
+    data = np.load(cfg.data.data_path)
 
     imgs_true = data["imgs_true"][cfg.sampling.start_ind:cfg.sampling.end_ind, ...]
     imgs_pred = data["imgs_pred"][cfg.sampling.start_ind:cfg.sampling.end_ind, ...]
@@ -83,7 +83,7 @@ def main(cfg: DictConfig):
     chkpts_name = cfg.sampling.model_path
     print(f"Loading model from: {chkpts_name}")
 
-    checkpoint = torch.load(chkpts_name)
+    checkpoint = torch.load(chkpts_name, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
