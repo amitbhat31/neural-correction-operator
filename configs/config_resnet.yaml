@@ -65,15 +65,16 @@ reproducibility:
 # New sampling configuration section
 sampling:
   # Data loading parameters
-  start_ind: 0
-  end_ind: 100
+  start_ind: 4100
+  end_ind: 4200
   batch_size: 1
+  clip_coeff: 1.0
   
   # Model loading parameters
-  model_path: "path/to/your/trained_model.pth"
+  model_path: "checkpoint"
   
   # Output parameters
-  samples_path: "path/to/save/samples.npy"
+  samples_path: "samples/resnet_samples_{dataset}_{bfgs_iters}_noise_{noise}.npy"
   
   # Processing parameters
   clip_coeff: 1.0 

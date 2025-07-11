@@ -8,7 +8,7 @@ data:
   dataset_type: "circs"
   bfgs_iters: 350
   noise_level: 0.0
-  data_path: "/blue/chunmei.wang/amit.bhat/my_score_sde/downscaling_DDPM/Generative-downsscaling-PDE-solvers/eit_data/eit_images_405_350.npz"
+  data_path: "data/eit_images_405_350.npz"
 
 training:
   num_epochs: 20000
@@ -54,7 +54,7 @@ system:
   num_workers: 1
 
 output:
-  base_dir: "/blue/chunmei.wang/amit.bhat/noc/runs"
+  base_dir: "runs"
   logs_dir: "logs"
   figs_dir: "figs"
   models_dir: "mdls"
@@ -77,3 +77,20 @@ checkpoint:
 reproducibility:
   seed: 42
   deterministic: false 
+
+sampling:
+  # Data loading parameters
+  start_ind: 4100
+  end_ind: 4200
+  batch_size: 1
+  clip_coeff: 1.0
+  
+  # Model loading parameters
+  model_path: "checkpoint"
+  
+  # Output parameters
+  samples_path: "samples/ddpm_samples_{dataset}_{bfgs_iters}_noise_{noise}.npy"
+  
+  # Averaging parameters
+  num_copies: 10  # Number of copies to create for each image
+  save_individual_samples: false  # Whether to save individual samples in addition to averaged ones 

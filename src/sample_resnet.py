@@ -9,7 +9,7 @@ import time
 from utils import *
 from models.resnet import ResNet18, BasicBlock
 
-@hydra.main(config_path="../configs", config_name="config_resnet")
+@hydra.main(config_path="../configs", config_name="config_resnet_cursor")
 def main(cfg: DictConfig):
     device = torch.device(cfg.system.device if torch.cuda.is_available() else "cpu")
     
@@ -31,7 +31,17 @@ def main(cfg: DictConfig):
     cwd = os.getcwd()
     print(f"Working directory: {cwd}", flush=True)
 
-    # Load testing data
+    data_name = cfg.data.dataset_type
+    bfgs_iters = cfg.data.bfgs_iters
+    
+    samples_path = cfg.sampling.samples_path.format(
+        dataset=data_name,
+        bfgs_iters=bfgs_iters,
+        noise=num2str_deciaml(cfg.data.noise_level)
+    )
+    
+    print(f"Samples path: {samples_path}")
+
     data = np.load(cfg.sampling.data_path)
 
     imgs_true = data["imgs_true"][cfg.sampling.start_ind:cfg.sampling.end_ind, ...]
@@ -64,7 +74,6 @@ def main(cfg: DictConfig):
     model_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f'{cfg.model.name} number of parameters: {model_trainable_params}', flush=True)
 
-    # Load checkpoint
     chkpts_name = cfg.sampling.model_path
     print(f"Loading model from: {chkpts_name}")
 
@@ -72,14 +81,13 @@ def main(cfg: DictConfig):
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
-    # Generate predictions
     res = np.zeros((test_true.shape[0], N_pts, N_pts, 1))
 
     tic_start = time.time()
     for i, (x, x_hat) in enumerate(test_loader):
         x, x_hat = x.to(device), x_hat.to(device)
         print(f"Processing batch {i}: {x.shape}, {x_hat.shape}")
-        x_pred = model(x, x_hat)
+        x_pred = model(x_hat)
         res[i, ...] = x_pred.detach().cpu().numpy()
     
     tic_total = time.time() - tic_start
@@ -87,10 +95,8 @@ def main(cfg: DictConfig):
 
     print(f"Average inference time per sample: {avg_time:.4f} seconds")
 
-    # Save results
-    npy_name = cfg.sampling.samples_path
-    print(f"Saving results to: {npy_name}")
-    np.save(npy_name, res)
+    print(f"Saving results to: {samples_path}")
+    np.save(samples_path, res)
 
 if __name__ == "__main__":
     main() 
