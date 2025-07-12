@@ -24,9 +24,10 @@ def main(cfg: DictConfig):
 
     # Define grid - spanning [-0.5, 0.5] × [-0.5, 0.5] 
     N_pts = cfg.data.img_size
-    dx = 1 / (N_pts + 1)
-    points_x = np.linspace(-0.5 + dx, 0.5 - dx, N_pts).T
-    xx, yy = np.meshgrid(points_x, points_x)
+    lx, ly = cfg.data.lx, cfg.data.ly
+    points_x = np.linspace(-lx/2, lx/2, N_pts)
+    points_y = np.linspace(-ly/2, ly/2, N_pts)
+    xx, yy = np.meshgrid(points_x, points_y)
 
     cwd = os.getcwd()
     print(f"Working directory: {cwd}", flush=True)
