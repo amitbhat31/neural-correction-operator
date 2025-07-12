@@ -12,6 +12,7 @@ import scipy.io as sio
 from eit import EIT
 from fem import Mesh, V_h, dtn_map
 from utils import *
+from utils_shepp_logan import *
 
 
 def generate_shepp_logan_sigma(n, pad, GCOORD_down, centroids):
@@ -92,8 +93,8 @@ def main(
     nel         = nex*ney #number of finite elements
 
     img_size_down = original_size + 2*pad_size
-    x = np.linspace(-1, 1, img_size)
-    y = np.linspace(-1, 1, img_size)
+    x = np.linspace(-1, 1, img_size_down)
+    y = np.linspace(-1, 1, img_size_down)
     xx, yy = np.meshgrid(x, y)
     img_points = np.stack([xx.ravel(), yy.ravel()]).T
     GCOORD_down = img_points.reshape((img_size_down, img_size_down, 2))
@@ -152,8 +153,8 @@ def main(
             sq_img_pred[iel] = np.mean(ECOORD_pred)
             
         t_f = time.time()
-        print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
-        print(i, flush=True)
+        # print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
+        # print(i, flush=True)
         
     
         sq_img_true = np.flip(sq_img_true.reshape((nx-1, ny-1)), axis=0)

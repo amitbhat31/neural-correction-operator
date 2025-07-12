@@ -25,7 +25,7 @@ def generate_circles_sigma(p, selected):
     r3 = np.random.uniform(0.1, 0.4)
     r4 = np.random.uniform(0.1, 0.4)
 
-    total = 1
+    total = np.ones(p.shape[0], dtype=np.float64)
     if 1 in selected:
         cond1 = np.sqrt(np.sum((p - center_1)**2, axis=1)) < r1
         total += 2 * cond1
@@ -123,7 +123,6 @@ def main(
     v_h = V_h(mesh)
     
     centroids = np.mean(p[t], axis=1)  
-    print("here")
     
     sigma_true = np.zeros((num_samples, len(centroids)))
     sigma_pred = np.zeros((num_samples, len(centroids)))
@@ -161,8 +160,8 @@ def main(
             sq_img_pred[iel] = np.mean(ECOORD_pred)
             
         t_f = time.time()
-        print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
-        print(i, flush=True)
+        # print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
+        # print(i, flush=True)
         
     
         sq_img_true = np.flip(sq_img_true.reshape((nx-1, ny-1)), axis=0)

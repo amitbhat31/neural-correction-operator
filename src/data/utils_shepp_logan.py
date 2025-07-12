@@ -28,9 +28,7 @@ def randomSheppLogan(n=512, default = False, phantom_type='msl', pad=4, M=1):
     return images
     
 def generateImage(e, n, X, Y):
-    print('gen_image')
     image = np.zeros((n, n))
-    print(e.shape)
     e[:, 1] = e[:, 1] ** 2
     e[:, 2] = e[:, 2] ** 2
     e[:, 5] = e[:, 5] * np.pi / 180
