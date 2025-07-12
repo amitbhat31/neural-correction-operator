@@ -1,75 +1,38 @@
+import os
+import time
 import numpy as np
 import scipy
 import math
 import click
 
-
-
 import scipy.optimize as op
 from scipy.optimize import Bounds
-import time
-
 import scipy.io as sio
 
 from eit import EIT
 from fem import Mesh, V_h, dtn_map
+from utils import *
 
 
+def generate_shepp_logan_sigma(n, pad, GCOORD_down, centroids):
+    sl = randomSheppLogan(n=n, pad = pad, M = 1).reshape((n + 2* pad, n + 2* pad))
+    sl_sigma = interpolate_pts(GCOORD_down, sl.flatten(), centroids)
 
-def generate_GCOORD(lx, ly, nx, ny):
+    return sl_sigma
 
-    x_coords = np.linspace(-lx / 2, lx / 2, nx)
-    y_coords = np.linspace(-ly / 2, ly / 2, ny)
-    
-    xv, yv = np.meshgrid(x_coords, y_coords)
-    GCOORD = np.vstack([xv.ravel(), yv.ravel()]).T
-    
-    return GCOORD
 
-def assemble_EL_connectivity(nel, nnodel, nex, nx):
-    EL2NOD = np.zeros((nel,nnodel), dtype=int)
+def generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise):
 
-    for iel in range(0,nel):
-        row = iel//nex   
-        ind = iel + row
-        EL2NOD[iel,:] = np.array([ind, ind+1, ind+nx+1, ind+nx])
-        
-    return EL2NOD
-
-def interpolate_pts(known_pts, known_vals, interp_pts):
-
-    interp_vals = scipy.interpolate.griddata(known_pts, known_vals, interp_pts, method='linear', fill_value=1.)
-
-    for i in range(len(interp_pts)):
-        curr_pt = interp_pts[i]
-        dist = math.sqrt(curr_pt[0]**2 + curr_pt[1]**2)
-        if dist >= 1:
-            interp_vals[i] = 1.
-
-    return interp_vals
-
-def generate_EIT_sol(num_iters, p, t, bdy_idx, vol_idx, sigma_vec_true, noise):
-
-    # define the mesh
-    mesh = Mesh(p, t, bdy_idx, vol_idx)
-
-    # define the approximation space
-    v_h = V_h(mesh)
-
-    # extracting the DtN data
     dtn_data, sol = dtn_map(v_h, sigma_vec_true)
 
+    # add desired noise
     noise_data = noise * dtn_data
-
     dtn_data = dtn_data + noise_data
 
-    # this is the initial guess
-    sigma_vec_0 = 1. + np.zeros(t.shape[0], dtype=np.float64)
+    # initial guess: 1 is value of background medium
+    sigma_vec_0 = 1. + np.zeros(mesh.t.shape[0], dtype=np.float64)
 
-    # we create the eit wrapper
     eit = EIT(v_h)
-
-    # build the stiffness matrices
     eit.update_matrices(sigma_vec_0)
 
     def J(x):
@@ -81,7 +44,7 @@ def generate_EIT_sol(num_iters, p, t, bdy_idx, vol_idx, sigma_vec_true, noise):
     bounds_r = [np.inf for _ in range(len(sigma_vec_0))]
     bounds = Bounds(bounds_l, bounds_r)
 
-    # t_i = time.time()
+    t_i = time.time()
     res = op.minimize(J, sigma_vec_0, method='L-BFGS-B',
                       jac = True,
                       tol = opt_tol,
@@ -91,33 +54,30 @@ def generate_EIT_sol(num_iters, p, t, bdy_idx, vol_idx, sigma_vec_true, noise):
                      )
                        # callback=callback)
 
-    # t_f = time.time()
-    # print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
+    t_f = time.time()
+    print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
 
     return res.x
 
 @click.command()
 @click.option('--img-size', type=int, required=True, help='size of output image')
+@click.option('--num-samples', type=int, required=True, help='number of samples')
 @click.option('--noise', type=float, required=True, help='noise level')
 @click.option('--num-iters', type=int, required=True, help='max number of BFGS iterations')
-@click.option('--start', type=int, required=True, help='start number')
-@click.option('--end', type=int, required=True, help='end number')
-@click.option('--mesh-path', type=str, required=True, help='path to the mesh file')
-@click.option('--dataset-path', type=str, required=True, help='directory with MAF datasets')
-@click.option('--new-data-path', type=str, required=True, help='path to the model checkpoint')
-@click.option('--load-path', type=str, required=False, help='path to stored data')
+@click.option('--original-size', type=int, required=True, help='size of original image')
+@click.option('--pad-size', type=int, required=True, help='size of padding')
+@click.option('--data-root', type=str, required=True, help='root directory for the dataset')
+@click.option('--mesh-file', type=str, required=True, help='name of the mesh file')
 def main(
     img_size: int,
+    num_samples: int,
     noise: float,
     num_iters: int,
-    start: int,
-    end: int,
-    mesh_path: str,
-    dataset_path: str,
-    new_data_path: str,
-    load_path: str,
+    original_size: int,
+    pad_size: int,
+    data_root: str,
+    mesh_file: str,
 ):
-
     #geometry
     nx          = img_size + 1
     ny          = img_size + 1
@@ -131,79 +91,69 @@ def main(
     nnod        = nx*ny #number of nodes
     nel         = nex*ney #number of finite elements
 
-     #generate square mesh and element connectivity
+    img_size_down = original_size + 2*pad_size
+    x = np.linspace(-1, 1, img_size)
+    y = np.linspace(-1, 1, img_size)
+    xx, yy = np.meshgrid(x, y)
+    img_points = np.stack([xx.ravel(), yy.ravel()]).T
+    GCOORD_down = img_points.reshape((img_size_down, img_size_down, 2))
+    GCOORD_down = np.flip(GCOORD_down, axis=0)
+    GCOORD_down = GCOORD_down.reshape((-1, 2))
+
+    #generate square mesh and element connectivity
     GCOORD = generate_GCOORD(lx, ly, nx, ny)
     EL2NOD = assemble_EL_connectivity(nnod, nnodel, nex, nx)
 
-    #retrieve construction of circular mesh
-    mat_fname  = mesh_path
+    mat_fname  = os.path.join(data_root, mesh_file)
     mat_contents = sio.loadmat(mat_fname)
     
-    # points
     p = np.array(mat_contents['p'])
-    #triangle
-    t = np.array(mat_contents['t']-1) # all the indices should be reduced by one
-    # volumetric indices
-    vol_idx = mat_contents['vol_idx'].reshape((-1,))-1 # all the indices should be reduced by one
-    # indices at the boundaries
-    bdy_idx = mat_contents['bdy_idx'].reshape((-1,))-1 # all the indices should be reduced by one
+    t = np.array(mat_contents['t']-1) 
+    vol_idx = mat_contents['vol_idx'].reshape((-1,))-1 
+    bdy_idx = mat_contents['bdy_idx'].reshape((-1,))-1 
     
-    centroids = np.mean(p[t], axis=1)  # Calculate the mean along the columns to get the centroids
+    mesh = Mesh(p, t, bdy_idx, vol_idx)
+    v_h = V_h(mesh)
+    
+    centroids = np.mean(p[t], axis=1)  
     print("here")
-    
-    path = dataset_path
-    data_arr = np.load(path)
-
-    num_samples = len(data_arr['sigma'])
     
     sigma_true = np.zeros((num_samples, len(centroids)))
     sigma_pred = np.zeros((num_samples, len(centroids)))
-    imgs_true = np.zeros((num_samples, nx-1, ny-1))
-    imgs_pred = np.zeros((num_samples, nx-1, ny-1))
+    imgs_true = np.zeros((num_samples, img_size, img_size))
+    imgs_pred = np.zeros((num_samples, img_size, img_size))
 
-    start_num = start
-    print(start_num, flush=True)
-    print(nx, ny, flush=True)
-    print(imgs_true.shape, flush=True)
+    print(imgs_true.shape)
+    print(imgs_pred.shape)
+    print(sigma_true.shape)
+    print(sigma_pred.shape)
 
-    if start_num != 0: 
-        curr_ims = np.load(load_path)
-        print(curr_ims['imgs_true'].shape)
-        print(np.count_nonzero(curr_ims['imgs_true']))
-        sigma_true[:start_num, ...] = curr_ims['sigma_true'][:start_num, ...]
-        sigma_pred[:start_num, ...] = curr_ims['sigma_pred'][:start_num, ...]
-        imgs_true[:start_num, ...] = curr_ims['imgs_true'][:start_num, ...]
-        imgs_pred[:start_num, ...] = curr_ims['imgs_pred'][:start_num, ...]
-    # print(len(data_arr))
-    print(np.count_nonzero(imgs_pred), flush=True)
-
-    save_path = new_data_path + '_i_' + str(num_iters) + '_r_' + str(img_size) + '_n_' + str(noise) 
+    save_name = f"circles_bfgs_{str(num_iters)}_res_{str(img_size)}_noise_{str(noise)}"
+    save_path = os.path.join(data_root, save_name)
+    print(save_path)
     
-    for i in range(start_num, end):
-        sigma_vec_true = data_arr['sigma'][i]
-
+    for i in range(num_samples):
+        sigma_vec_true = generate_shepp_logan_sigma(original_size, pad_size, GCOORD_down, centroids)
+ 
         t_i = time.time()
-        sigma_vec_pred = generate_EIT_sol(num_iters, p, t, bdy_idx, vol_idx, sigma_vec_true, noise)
+        sigma_vec_pred = generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise)
         
         sq_img_true = 1. + np.zeros((nx-1) * (ny-1))
         sq_img_pred = 1. + np.zeros((nx-1) * (ny-1))
 
-         
         interp_vals_true = interpolate_pts(centroids, sigma_vec_true, GCOORD)
         interp_vals_pred = interpolate_pts(centroids, sigma_vec_pred, GCOORD)
         for iel in range(0,nel):
-            # ECOORD = np.take(GCOORD, EL2NOD[iel, :], axis=0)
             ECOORD_true = np.take(interp_vals_true, EL2NOD[iel, :], axis=0)
             ECOORD_pred = np.take(interp_vals_pred, EL2NOD[iel, :], axis=0)
-            # print(ECOORD)
-            #based on ECOORD pts, average them out to find pixel value and assing
             
+            #based on ECOORD pts, average them out to find pixel value 
             sq_img_true[iel] = np.mean(ECOORD_true)
             sq_img_pred[iel] = np.mean(ECOORD_pred)
             
-            # break
         t_f = time.time()
-        # sigma_vec_0 = res.x
+        print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
+        print(i, flush=True)
         
     
         sq_img_true = np.flip(sq_img_true.reshape((nx-1, ny-1)), axis=0)
@@ -223,19 +173,12 @@ def main(
         #append to big new dataset here
         
     #save big new dataset when done
-    print(imgs_true.shape)
-    print(imgs_pred.shape)
+    print(imgs_true.shape, np.count_nonzero(imgs_true))
+    print(imgs_pred.shape, np.count_nonzero(imgs_pred))
     
-    npy_name = save_path
-    np.savez(npy_name, imgs_true=imgs_true, imgs_pred=imgs_pred, sigma_true=sigma_true, sigma_pred=sigma_pred)
+    np.savez(save_path, imgs_true=imgs_true, imgs_pred=imgs_pred, sigma_true=sigma_true, sigma_pred=sigma_pred)
     
-    
-        
 
 # Check if the script is being run directly (not imported)
 if __name__ == "__main__":
     main()
-    
-
-
-

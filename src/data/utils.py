@@ -33,3 +33,9 @@ def interpolate_pts(known_pts, known_vals, interp_pts):
             interp_vals[i] = 1.
 
     return interp_vals
+
+def central_crop(img, crop_size):
+    h, w = img.shape
+    startx = w // 2 - (crop_size // 2)
+    starty = h // 2 - (crop_size // 2)
+    return img[startx:startx+crop_size, starty:starty+crop_size]

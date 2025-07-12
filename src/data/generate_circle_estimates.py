@@ -125,7 +125,6 @@ def main(
     centroids = np.mean(p[t], axis=1)  
     print("here")
     
-    
     sigma_true = np.zeros((num_samples, len(centroids)))
     sigma_pred = np.zeros((num_samples, len(centroids)))
     imgs_true = np.zeros((num_samples, img_size, img_size))
@@ -187,8 +186,6 @@ def main(
     print(imgs_pred.shape, np.count_nonzero(imgs_pred))
     
     np.savez(save_path, imgs_true=imgs_true, imgs_pred=imgs_pred, sigma_true=sigma_true, sigma_pred=sigma_pred)
-    
-    
         
 
 # Check if the script is being run directly (not imported)
