@@ -4,11 +4,14 @@ data:
   val_samples: 100
   test_samples: 900
   img_size: 64
+  lx: 2
+  ly: 2
   # circs or sl
   dataset_type: "circs"
   bfgs_iters: 350
   noise_level: 0.0
-  data_path: "path/to/your/data.npz"
+  data_path: "data_path"
+  mesh_path: "mesh_path"
 
 training:
   num_epochs: 20000
@@ -62,7 +65,6 @@ reproducibility:
   seed: 42
   deterministic: false 
 
-# New sampling configuration section
 sampling:
   # Data loading parameters
   start_ind: 4100
@@ -70,11 +72,6 @@ sampling:
   batch_size: 1
   clip_coeff: 1.0
   
-  # Model loading parameters
-  model_path: "checkpoint"
-  
-  # Output parameters
+  model_path: "model_path"
   samples_path: "samples/resnet_samples_{dataset}_{bfgs_iters}_noise_{noise}.npy"
   
-  # Processing parameters
-  clip_coeff: 1.0 

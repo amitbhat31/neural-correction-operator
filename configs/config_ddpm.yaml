@@ -4,11 +4,14 @@ data:
   val_samples: 100
   test_samples: 900
   img_size: 64
+  lx: 2
+  ly: 2
   # circs or sl
   dataset_type: "circs"
   bfgs_iters: 350
   noise_level: 0.0
-  data_path: "data/eit_images_405_350.npz"
+  data_path: "data_path"
+  mesh_path: "mesh_path"
 
 training:
   num_epochs: 20000
@@ -44,7 +47,7 @@ model:
     
     up_config_template:
       - ["8*c0", "4*c0", 3, 2, 32, 0]
-      - ["4*c0+4*c0", "2*c0", 3, 2, 32, 1]
+      - ["4*c0 + 4*c0", "2*c0", 3, 2, 32, 0]
       - ["2*c0+2*c0", "c0", 3, 2, 32, 1]
       - ["c0+c0", 1, 9, 1, 4]
 
@@ -85,12 +88,12 @@ sampling:
   batch_size: 1
   clip_coeff: 1.0
   
+  # Averaging parameters
+  num_copies: 10
+  save_individual_samples: false
+  
   # Model loading parameters
-  model_path: "checkpoint"
+  model_path: "model_path"
   
   # Output parameters
-  samples_path: "samples/ddpm_samples_{dataset}_{bfgs_iters}_noise_{noise}.npy"
-  
-  # Averaging parameters
-  num_copies: 10  # Number of copies to create for each image
-  save_individual_samples: false  # Whether to save individual samples in addition to averaged ones 
+  samples_path: "samples/ddpm_samples_{dataset}_{bfgs_iters}_noise_{noise}.npy"   

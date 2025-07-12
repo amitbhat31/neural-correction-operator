@@ -97,6 +97,7 @@ def main(cfg: DictConfig):
     print(f"Average inference time per sample: {avg_time:.4f} seconds")
 
     print(f"Saving results to: {samples_path}")
+    os.makedirs(os.path.dirname(samples_path), exist_ok=True)
     np.save(samples_path, res)
 
 if __name__ == "__main__":

@@ -109,6 +109,7 @@ def main(cfg: DictConfig):
         
         # Save averaged results
         print(f"Saving averaged results to: {samples_path}")
+        os.makedirs(os.path.dirname(samples_path), exist_ok=True)
         np.save(samples_path, pd_averaged)
         
         if cfg.sampling.save_individual_samples:
@@ -118,6 +119,7 @@ def main(cfg: DictConfig):
     else:
         # Save results without averaging
         print(f"Saving results to: {samples_path}")
+        os.makedirs(os.path.dirname(samples_path), exist_ok=True)
         np.save(samples_path, pd)
 
 if __name__ == "__main__":
