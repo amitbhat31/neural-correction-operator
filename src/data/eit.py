@@ -7,7 +7,7 @@ import scipy.integrate as integrate
 import numba
 from numba import jit, void, int64, float64, uint16
 
-from eit.fem import Mesh, V_h, partial_deriv_matrix, mass_matrix
+from fem import Mesh, V_h, partial_deriv_matrix, mass_matrix
 
 class EIT:
     def __init__(self, v_h):

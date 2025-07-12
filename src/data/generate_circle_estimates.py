@@ -1,3 +1,4 @@
+import os
 import time
 import numpy as np
 import scipy
@@ -40,10 +41,7 @@ def generate_circles_sigma(p, selected):
     return total
 
 
-def generate_EIT_sol(num_iters, p, t, bdy_idx, vol_idx, sigma_vec_true, noise):
-
-    mesh = Mesh(p, t, bdy_idx, vol_idx)
-    v_h = V_h(mesh)
+def generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise):
 
     dtn_data, sol = dtn_map(v_h, sigma_vec_true)
 
@@ -52,7 +50,7 @@ def generate_EIT_sol(num_iters, p, t, bdy_idx, vol_idx, sigma_vec_true, noise):
     dtn_data = dtn_data + noise_data
 
     # initial guess: 1 is value of background medium
-    sigma_vec_0 = 1. + np.zeros(t.shape[0], dtype=np.float64)
+    sigma_vec_0 = 1. + np.zeros(mesh.t.shape[0], dtype=np.float64)
 
     eit = EIT(v_h)
     eit.update_matrices(sigma_vec_0)
@@ -88,7 +86,6 @@ def generate_EIT_sol(num_iters, p, t, bdy_idx, vol_idx, sigma_vec_true, noise):
 @click.option('--num-iters', type=int, required=True, help='max number of BFGS iterations')
 @click.option('--data-root', type=str, required=True, help='root directory for the dataset')
 @click.option('--mesh-file', type=str, required=True, help='name of the mesh file')
-@click.option('--new-data-file', type=str, required=True, help='name for the new dataset')
 def main(
     img_size: int,
     num_samples: int,
@@ -96,7 +93,6 @@ def main(
     num_iters: int,
     data_root: str,
     mesh_file: str,
-    new_data_file: str,
 ):
     #geometry
     nx          = img_size + 1
@@ -123,6 +119,9 @@ def main(
     vol_idx = mat_contents['vol_idx'].reshape((-1,))-1 
     bdy_idx = mat_contents['bdy_idx'].reshape((-1,))-1 
     
+    mesh = Mesh(p, t, bdy_idx, vol_idx)
+    v_h = V_h(mesh)
+    
     centroids = np.mean(p[t], axis=1)  
     print("here")
     
@@ -137,16 +136,17 @@ def main(
     print(sigma_true.shape)
     print(sigma_pred.shape)
 
-    save_name = f"{new_data_file}_bfgs_{str(num_iters)}_res_{str(img_size)}_noise_{str(noise)}"
+    save_name = f"circles_bfgs_{str(num_iters)}_res_{str(img_size)}_noise_{str(noise)}"
     save_path = os.path.join(data_root, save_name)
     print(save_path)
     
     for i in range(num_samples):
-        selected = np.random.randint(1, 5)
-        sigma_vec_true = generate_circles_sigma(p, selected)
-
+        k = np.random.randint(1, 5)
+        selected = np.random.choice(np.arange(1, 6), size=k, replace=False)
+        sigma_vec_true = generate_circles_sigma(centroids, selected)
+ 
         t_i = time.time()
-        sigma_vec_pred = generate_EIT_sol(num_iters, p, t, bdy_idx, vol_idx, sigma_vec_true, noise)
+        sigma_vec_pred = generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise)
         
         sq_img_true = 1. + np.zeros((nx-1) * (ny-1))
         sq_img_pred = 1. + np.zeros((nx-1) * (ny-1))
@@ -162,6 +162,8 @@ def main(
             sq_img_pred[iel] = np.mean(ECOORD_pred)
             
         t_f = time.time()
+        print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
+        print(i, flush=True)
         
     
         sq_img_true = np.flip(sq_img_true.reshape((nx-1, ny-1)), axis=0)
