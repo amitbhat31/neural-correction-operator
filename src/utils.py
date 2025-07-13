@@ -1,8 +1,6 @@
 import torch
 import math
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 def num2str_deciaml(x):
     s = str(x)
     c = ''

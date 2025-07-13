@@ -1,3 +1,5 @@
+# Code for UNet implementation adapted from "https://github.com/woodssss/Generative-downsscaling-PDE-solvers".
+
 import numpy as np
 import math
 
@@ -10,11 +12,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class UNet(nn.Module):
 
     def __init__(self, config, unet_config):
-        # comments here
-
         super().__init__()
 
         self.Nt = config.ddpm.Nt
+
         #extract config params
         embed_dim = config.model.embed_dim
         down = unet_config['down_config']
@@ -107,7 +108,6 @@ class TimeEmbedding(nn.Module):
 
     def __init__(self, embed_dim, scale=30.):
         super().__init__()
-        # Weights randomly sampled and not optimized.
         self.W = nn.Parameter(torch.randn(embed_dim // 2) * scale, requires_grad=False)
 
     def forward(self, x):

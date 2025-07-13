@@ -1,3 +1,7 @@
+# Utility functions for DDPM and ResNet. 
+# Code for DDPM methods is from https://github.com/woodssss/Generative-downsscaling-PDE-solvers
+
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -67,7 +71,7 @@ def process_unet_config(config, c0, embed_dim):
     
     return unet_config
 
-#downsample dtn
+# Used for downsampling the Dirichlet-to-Neumann data for passing directly into DL models. 
 def downsample_dtn_data(x,v_h):
     
     dtn_data, _ = dtn_map(v_h, x)
@@ -77,17 +81,7 @@ def downsample_dtn_data(x,v_h):
     
     return down_dtn
 
-#DDPM utils
-
-def get_index_from_list(vals, t, x_shape):
-    """
-    Returns a specific index t of a passed list of values vals
-    while considering the batch dimension.
-    """
-    batch_size = t.shape[0]
-    out = vals.gather(-1, t.cpu())
-    return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
-
+# DDPM utils. 
 
 def extract(input, t, x):
     shape = x.shape
@@ -115,22 +109,17 @@ def rand_noise(x):
     return torch.randn_like(x)
 
 def q_x_t_cond_x_0(alphas_bar_sqrt, one_minus_alphas_bar_sqrt, x_0, t):
-    # compute q(x_t|x_0) = N (mean = sqrt(alpha bar))
     noise = rand_noise(x_0)
     x_0_coeff = extract(alphas_bar_sqrt, t, x_0)
     noise_ceoff = extract(one_minus_alphas_bar_sqrt, t, x_0)
     return x_0_coeff.to(device) * x_0.to(device) + noise_ceoff.to(device) * noise.to(device), noise.to(device)
 
 def get_loss(model, alphas_bar_sqrt, one_minus_alphas_bar_sqrt, Nt, x_0, x_c):
-    # we sample x_t at any specific t
     bs = x_0.shape[0]
     t = torch.randint(0, Nt, size=(bs // 2,))
     t = torch.cat([t, Nt - t - 1], dim=0)
-    #t = torch.randint(0, Nt, (bs,), device=device).long()
 
-    # use q_x_t_cond_x_0 tp generate x_t from x_0
     x_noise, noise = q_x_t_cond_x_0(alphas_bar_sqrt, one_minus_alphas_bar_sqrt, x_0, t)
-
     noise_approx = model(x_noise.to(device), x_c.to(device), t.to(device))
 
     return myL2L(noise, noise_approx)
@@ -143,59 +132,6 @@ def get_parameters(beta_start, beta_end, Nt):
     one_minus_alphas_bar_sqrt = torch.sqrt(1 - alphas_bar)
     sigma = torch.sqrt(betas)
     return betas, alphas, alphas_bar, alphas_bar_sqrt, one_minus_alphas_bar_sqrt, sigma
-
-def get_L(Nx, dim):
-    dx = 1 / (1 + Nx)
-    Lap = np.zeros((Nx, Nx))
-    for i in range(Nx):
-        Lap[i][i] = -2
-
-    for i in range(Nx - 1):
-        Lap[i + 1][i] = 1
-        Lap[i][i + 1] = 1
-
-    L = Lap / dx ** 2
-    Ls = sparse.csr_matrix(L)
-
-    if dim==2:
-        Lx = sparse.kron(Ls, sparse.eye(Nx))
-        Ly = sparse.kron(sparse.eye(Nx), Ls)
-        Lap = Lx + Ly
-    elif dim==3:
-        Lx = sparse.kron(Ls, sparse.kron(sparse.eye(Nx), sparse.eye(Nx)))
-        Ly = sparse.kron(sparse.eye(Nx), sparse.kron(Ls, sparse.eye(Nx)))
-        Lz = sparse.kron(sparse.eye(Nx), sparse.kron(sparse.eye(Nx), Ls))
-        Lap = Lx + Ly + Lz
-    return Lap
-
-
-def up_sample_1d(Nx_c, Nx_f, x_c, x_f, f_c):
-    x_c = np.concatenate([-1.1*np.ones((1, 1)), x_c, np.ones((1, 1))*1.1], axis=0)
-    x_f = np.concatenate([-1.1*np.ones((1, 1)), x_f, np.ones((1, 1))*1.1], axis=0)
-    f_c = np.concatenate([np.zeros((1)), f_c, np.zeros((1))], axis=0)
-    func = CubicSpline(x_c[:, 0], f_c)
-    f_f = func(x_f[1:-1, 0])
-    f_f = f_f[:Nx_f]
-
-    return f_f
-
-
-def up_sample_2d(Nx_c, Nx_f, x_c, x_f, f_c):
-
-    f_f_1 = np.zeros((Nx_c, Nx_f))
-    f_f_2 = np.zeros((Nx_f, Nx_f))
-
-    for i in range(Nx_c):
-        f_f_1[i, :] = up_sample_1d(Nx_c, Nx_f, x_c, x_f, f_c[i, :])
-
-    for j in range(Nx_f):
-        f_f_2[:, j] = up_sample_1d(Nx_c, Nx_f, x_c, x_f, f_f_1[:, j])
-
-    f_f = f_f_2[:Nx_f, :Nx_f]
-
-    return f_f
-
-
 
 def solver_ddpm(model, clip, sigma, alphas, one_minus_alphas_bar_sqrt, Nt, u_c_mat):
     bs = u_c_mat.shape[0]
@@ -233,12 +169,11 @@ def sample_backward_ddpm_step(model, sigma, alphas, one_minus_alphas_bar_sqrt, x
         return mean + sigma_t * z
 
 def sample_backward_loop_ddpm(model, clip, sigma, alphas, one_minus_alphas_bar_sqrt, Nt, x_c):
-    # x_T from guidance info
     x_T = torch.randn_like(x_c)
     x_seq = [x_T.detach().cpu()]
     x_tmp_cpu = x_T
 
-    for i in range(Nt)[::-1]: # check here
+    for i in range(Nt)[::-1]: 
 
         x_tmp = sample_backward_ddpm_step(model, sigma, alphas, one_minus_alphas_bar_sqrt, x_tmp_cpu.to(device), x_c.to(device), i)
 
@@ -252,7 +187,6 @@ def sample_backward_loop_ddpm(model, clip, sigma, alphas, one_minus_alphas_bar_s
 
         x_seq.append(x_tmp_cpu)
 
-    #x_seq = np.concatenate(x_seq, axis=0)
     x_seq = torch.cat(x_seq, dim=0)
 
     return x_seq
@@ -267,9 +201,6 @@ def get_plot_sample_ddpm(config, Nt, xx, yy, GCOORD, Process, pd, test_hat, test
     curr_hat = interpolate_pts(GCOORD, test_hat[idx, ..., 0].detach().cpu().numpy().flatten(), centroids)
     curr_true = interpolate_pts(GCOORD, test_true[idx, ..., 0].detach().cpu().numpy().flatten(), centroids)
     curr_ddpm = interpolate_pts(GCOORD, pd[idx, ..., 0].flatten(), centroids)
-    print("interpolated shapes", curr_hat.shape, curr_true.shape, curr_ddpm.shape)
-
-    print('max grad', md_hat, md_true, md_ddpm)
 
     fig, ax = plt.subplots(1, 11, figsize=(20, 3))
 
@@ -309,23 +240,6 @@ def get_plot_sample_ddpm(config, Nt, xx, yy, GCOORD, Process, pd, test_hat, test
     fig2.savefig(fig_name + '_epoch_step_' + str(step) + '_pd.jpg')
 
     plt.show()
-
-def max_grad(f):
-    #f = f.detach().cpu()
-    N = f.shape[0]
-    max_d = 1e-4 * torch.ones(1,).to(device)
-    for i in range(1, N - 1):
-        for j in range(1, N - 1):
-            dx = torch.abs(f[i, j] - f[i - 1, j]) * N
-            dy = torch.abs(f[i, j] - f[i, j - 1]) * N
-
-            max_d = torch.max(max_d, dx)
-            max_d = torch.max(max_d, dy)
-
-            # max_d = np.maximum(max_d, dx)
-            # max_d = np.maximum(max_d, dy)
-
-    return max_d
 
 def plot_resnet_results(config, xx, yy, GCOORD, x_hat, x_true, x_pred, fig_name, step, centroids, triangulation):
     idx = 0

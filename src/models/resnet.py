@@ -25,25 +25,6 @@ class BasicBlock(nn.Module):
         out += self.shortcut(x)
         out = F.relu(out)
         return out
-    
-    # def forward(self, x): 
-    #     print("start block")
-    #     out = self.conv1(x)
-    #     print(f"conv1: {out.shape}")
-    #     out = self.bn1(out)
-    #     print(f"batchnorm1: {out.shape}")
-    #     out = F.relu(out)
-    #     print(f"relu1: {out.shape}")
-    #     out = self.conv2(out)
-    #     print(f"conv2: {out.shape}")
-    #     out = self.bn2(out)
-    #     print(f"batchnorm2: {out.shape}")
-    #     out += self.shortcut(x)
-    #     print(f"shortcut shape: {self.shortcut(x).shape}")
-    #     print(f"add skip: {out.shape}")
-    #     out = F.relu(out)
-    #     print(f"relu2: {out.shape}")
-    #     return out
 
 
 class ResNet18(nn.Module):
@@ -52,9 +33,7 @@ class ResNet18(nn.Module):
 
         conf = config.model
         self.in_planes = conf.in_planes
-        
-
-
+    
         self.conv1 = nn.Conv2d(conf.in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)

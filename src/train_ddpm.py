@@ -29,7 +29,7 @@ def main(cfg: DictConfig):
     else:
         torch.backends.cudnn.benchmark = cfg.system.cudnn_benchmark
 
-    # Define grids for plotting and interpolation
+    # Define grids for plotting and interpolation spanning [-1, 1] × [-1, 1] 
     N_pts = cfg.data.img_size
     lx, ly = cfg.data.lx, cfg.data.ly
     points_x = np.linspace(-lx/2, lx/2, N_pts)
@@ -40,21 +40,17 @@ def main(cfg: DictConfig):
     GCOORD = GCOORD.reshape((N_pts, N_pts, 2))
     GCOORD = np.flip(GCOORD, axis=0)
     GCOORD = GCOORD.reshape((-1, 2))
-    print("GCOORD shape", GCOORD.shape)
-    
 
-    # loading the file containing the mesh
+
+    # load the file containing the mesh
     mat_fname  = cfg.data.mesh_path
     mat_contents = sio.loadmat(mat_fname)
 
     p = mat_contents['p']
-    t = mat_contents['t']-1 # all the indices should be reduced by one
+    t = mat_contents['t']-1 
     centroids = np.mean(p[t], axis=1)
     triangulation = tri.Triangulation(p[:,0], p[:,1], t)
 
-
-    cwd = os.getcwd()
-    print(f"Working directory: {cwd}", flush=True)
 
     data_name = cfg.data.dataset_type
     bfgs_iters = cfg.data.bfgs_iters
@@ -69,8 +65,6 @@ def main(cfg: DictConfig):
         lr_min=num2str_deciaml(cfg.training.lr_min),
         Nt=cfg.ddpm.Nt
     )
-    print(f"Save name: {save_name}")
-
 
     data = np.load(cfg.data.data_path)
     imgs_true = data["imgs_true"][:cfg.data.total_samples, ...]
@@ -79,70 +73,48 @@ def main(cfg: DictConfig):
     imgs_true = torch.from_numpy(imgs_true).float().reshape(cfg.data.total_samples, cfg.data.img_size, cfg.data.img_size, 1)
     imgs_pred = torch.from_numpy(imgs_pred).float().reshape(cfg.data.total_samples, cfg.data.img_size, cfg.data.img_size, 1)
 
-    print(f"Data shapes: {imgs_true.shape}, {imgs_pred.shape}", flush=True)
-
     clip = torch.max(torch.abs(imgs_pred)) * cfg.ddpm.clip_coeff
     
-    # Create training dataset
     dataset = []
     for i in range(cfg.data.train_samples):
         tmp_ls = []
         tmp_ls.append(imgs_true[i, ...])
         tmp_ls.append(imgs_pred[i, ...])
         dataset.append(tmp_ls)
-    
     data_loader = DataLoader(dataset, batch_size=cfg.training.batch_size, shuffle=True, num_workers=cfg.system.num_workers)
 
-    print('Loaded training data', flush=True)
-    
-    # Create validation/test data
     val_pred = imgs_pred[cfg.data.train_samples:cfg.data.train_samples+cfg.data.val_samples, ...]
     val_true = imgs_true[cfg.data.train_samples:cfg.data.train_samples+cfg.data.val_samples, ...]
-    print(f"Test data shapes: {val_pred.shape}, {val_true.shape}", flush=True)
 
-    # Process UNet configuration
     unet_config = process_unet_config(cfg, cfg.model.c0, cfg.model.embed_dim)
     
-    # Create model 
     if cfg.model.name == 'UNet':
         model = UNet(cfg, unet_config).to(device)
     else:
         raise ValueError(f"Unknown model name: {cfg.model.name}")
 
-    model_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f'{cfg.model.name} number of parameters: {model_trainable_params}', flush=True)
-
-    # Setup optimizer and scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training.lr_max)
-    
     if cfg.training.scheduler == "cosine_annealing":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.training.num_epochs, eta_min=cfg.training.lr_min)
     else:
         raise ValueError(f"Unknown scheduler: {cfg.training.scheduler}")
     
-    # Define diffusion parameters
+
     betas, alphas, alphas_bar, alphas_bar_sqrt, one_minus_alphas_bar_sqrt, sigma = get_parameters(
         cfg.ddpm.beta_start, cfg.ddpm.beta_end, cfg.ddpm.Nt
     )
 
-    # Setup logging and output paths
     log_name = os.path.join(cwd, cfg.output.base_dir, cfg.output.logs_dir, f"{save_name}_log.txt")
     fig_name = os.path.join(cwd, cfg.output.base_dir, cfg.output.figs_dir, save_name)
     chkpts_name = os.path.join(cwd, cfg.output.base_dir, cfg.output.models_dir, save_name)
 
-    # Create directories if they don't exist
     os.makedirs(os.path.dirname(log_name), exist_ok=True)
     os.makedirs(os.path.dirname(fig_name), exist_ok=True)
     os.makedirs(os.path.dirname(chkpts_name), exist_ok=True)
 
-    print(f"Log: {log_name}")
-    print(f"Figs: {fig_name}")
-    print(f"Checkpoints: {chkpts_name}", flush=True)
-
-    content = 'start training'
+    content = f'Save name: {save_name}'
     mylogger(log_name, content)
     
-    # Training loop
     tic = time.time()
     for k in range(cfg.training.num_epochs + 1):
         model.train()
@@ -161,25 +133,19 @@ def main(cfg: DictConfig):
         
         if k % cfg.training.record_epoch == 0 and k > 0:
             model.eval()
-            # Record time and loss
             elapsed_time = time.time() - tic
             content = f'at epoch {k} the total training time is {elapsed_time:.3f} and the empirical loss is: {loss:.3f}'
-            print(content, flush=True)
             mylogger(log_name, content)
             
-            # Validation step
             if cfg.validation.enabled:
                 pd, Process = solver_ddpm(model, clip, sigma, alphas, one_minus_alphas_bar_sqrt, cfg.ddpm.Nt, val_pred[..., [0]])
 
                 get_plot_sample_ddpm(cfg, cfg.ddpm.Nt, xx, yy,  GCOORD, Process, pd, val_pred, val_true, fig_name, k, centroids, triangulation)
 
-                error_pd = myRL2_np(tensor2nump(val_true), pd)
+                error_pd = myRL2_np(tensor2nump(val_true), pd)  
                 content = f'at step: {k}, Relative L2 error of ddpm is: {error_pd:.3f}'
-
                 mylogger(log_name, content)
-                print(content, flush=True)
             
-            # Save checkpoint
             if cfg.checkpoint.save and k % cfg.training.save_frequency == 0:
                 current_lr = scheduler.get_last_lr()[0]
                 checkpoint = {

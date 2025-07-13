@@ -22,15 +22,6 @@ def main(cfg: DictConfig):
     else:
         torch.backends.cudnn.benchmark = cfg.system.cudnn_benchmark
 
-    # Define grid - spanning [-0.5, 0.5] × [-0.5, 0.5] 
-    N_pts = cfg.data.img_size
-    lx, ly = cfg.data.lx, cfg.data.ly
-    points_x = np.linspace(-lx/2, lx/2, N_pts)
-    points_y = np.linspace(-ly/2, ly/2, N_pts)
-    xx, yy = np.meshgrid(points_x, points_y)
-
-    cwd = os.getcwd()
-    print(f"Working directory: {cwd}", flush=True)
 
     data_name = cfg.data.dataset_type
     bfgs_iters = cfg.data.bfgs_iters
@@ -41,8 +32,6 @@ def main(cfg: DictConfig):
         noise=num2str_deciaml(cfg.data.noise_level)
     )
     
-    print(f"Samples path: {samples_path}")
-
     data = np.load(cfg.data.data_path)
 
     imgs_true = data["imgs_true"][cfg.sampling.start_ind:cfg.sampling.end_ind, ...]
@@ -51,11 +40,7 @@ def main(cfg: DictConfig):
     test_hat = torch.from_numpy(imgs_pred).float().reshape(-1, cfg.data.img_size, cfg.data.img_size, 1)
     test_true = torch.from_numpy(imgs_true).float().reshape(-1, cfg.data.img_size, cfg.data.img_size, 1)
 
-    print(f"Data shapes: {imgs_true.shape}, {imgs_pred.shape}", flush=True)
-
     clip = torch.max(torch.abs(test_true)) * cfg.sampling.clip_coeff
-
-    print(f"Test data shapes: {test_hat.shape}, {test_true.shape}", flush=True)
 
     test_data = []
     for i in range(test_true.shape[0]):
@@ -63,17 +48,13 @@ def main(cfg: DictConfig):
         tmp_ls.append(test_true[i, ...])   
         tmp_ls.append(test_hat[i, ...])
         test_data.append(tmp_ls)
-
     test_loader = DataLoader(test_data, batch_size=cfg.sampling.batch_size, num_workers=cfg.system.num_workers)
 
-    # Create model
     if cfg.model.name == "resNet":
         model = ResNet18(cfg).to(device)
     else:
         raise ValueError(f"Unknown model name: {cfg.model.name}")
 
-    model_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f'{cfg.model.name} number of parameters: {model_trainable_params}', flush=True)
 
     chkpts_name = cfg.sampling.model_path
     print(f"Loading model from: {chkpts_name}")
@@ -87,7 +68,6 @@ def main(cfg: DictConfig):
     tic_start = time.time()
     for i, (x, x_hat) in enumerate(test_loader):
         x, x_hat = x.to(device), x_hat.to(device)
-        print(f"Processing batch {i}: {x.shape}, {x_hat.shape}")
         x_pred = model(x_hat)
         res[i, ...] = x_pred.detach().cpu().numpy()
     

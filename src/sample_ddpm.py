@@ -24,15 +24,6 @@ def main(cfg: DictConfig):
     else:
         torch.backends.cudnn.benchmark = cfg.system.cudnn_benchmark
 
-    # Define grid - spanning [-0.5, 0.5] × [-0.5, 0.5] 
-    N_pts = cfg.data.img_size
-    lx, ly = cfg.data.lx, cfg.data.ly
-    points_x = np.linspace(-lx/2, lx/2, N_pts)
-    points_y = np.linspace(-ly/2, ly/2, N_pts)
-    xx, yy = np.meshgrid(points_x, points_y)
-
-    cwd = os.getcwd()
-    print(f"Working directory: {cwd}", flush=True)
 
     data_name = cfg.data.dataset_type
     bfgs_iters = cfg.data.bfgs_iters
@@ -43,8 +34,6 @@ def main(cfg: DictConfig):
         noise=num2str_deciaml(cfg.data.noise_level)
     )
     
-    print(f"Samples path: {samples_path}")
-
     data = np.load(cfg.data.data_path)
 
     imgs_true = data["imgs_true"][cfg.sampling.start_ind:cfg.sampling.end_ind, ...]
@@ -54,28 +43,18 @@ def main(cfg: DictConfig):
     if cfg.sampling.num_copies > 1:
         imgs_true = np.repeat(imgs_true, cfg.sampling.num_copies, axis=0)
         imgs_pred = np.repeat(imgs_pred, cfg.sampling.num_copies, axis=0)
-        print(f"Created {cfg.sampling.num_copies} copies of each image. New shapes: {imgs_true.shape}, {imgs_pred.shape}", flush=True)
-
+        
     test_hat = torch.from_numpy(imgs_pred).float().reshape(-1, cfg.data.img_size, cfg.data.img_size, 1)
     test_true = torch.from_numpy(imgs_true).float().reshape(-1, cfg.data.img_size, cfg.data.img_size, 1)
 
-    print(f"Data shapes: {imgs_true.shape}, {imgs_pred.shape}", flush=True)
-
     clip = torch.max(torch.abs(test_true)) * cfg.ddpm.clip_coeff
-
-    print(f"Clip value: {clip}, Test data shapes: {test_hat.shape}, {test_true.shape}", flush=True)
 
     unet_config = process_unet_config(cfg, cfg.model.c0, cfg.model.embed_dim)
     
-    # Create model
     if cfg.model.name == 'UNet':
         model = UNet(cfg, unet_config).to(device)
     else:
         raise ValueError(f"Unknown model name: {cfg.model.name}")
-
-    model_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f'{cfg.model.name} number of parameters: {model_trainable_params}', flush=True)
-
 
     betas, alphas, alphas_bar, alphas_bar_sqrt, one_minus_alphas_bar_sqrt, sigma = get_parameters(
         cfg.ddpm.beta_start, cfg.ddpm.beta_end, cfg.ddpm.Nt
@@ -119,7 +98,7 @@ def main(cfg: DictConfig):
     else:
         # Save results without averaging
         print(f"Saving results to: {samples_path}")
-        os.makedirs(os.path.dirname(samples_path), exist_ok=True)
+            os.makedirs(os.path.dirname(samples_path), exist_ok=True)
         np.save(samples_path, pd)
 
 if __name__ == "__main__":
