@@ -68,7 +68,7 @@ reproducibility:
 sampling:
   # Data loading parameters
   start_ind: 4100
-  end_ind: 4200
+  end_ind: 5000
   batch_size: 1
   clip_coeff: 1.0
   
