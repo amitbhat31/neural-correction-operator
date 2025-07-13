@@ -1,3 +1,6 @@
+# Code to generate Shepp-Logan phantoms. 
+# A Python implementation of the MATLAB code provided at https://github.com/matthiaschung/Random-Shepp-Logan-Phantom
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -12,7 +15,6 @@ def randomSheppLogan(n=512, default = False, phantom_type='msl', pad=4, M=1):
         z1 = np.zeros((n + 2 * pad, pad))
         z2 = np.zeros((pad, n))
          
-        
     for i in range(M):
         if default:
             curr_phantom = phantom

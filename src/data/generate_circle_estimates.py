@@ -13,8 +13,9 @@ from eit import EIT
 from fem import Mesh, V_h, dtn_map
 from utils import *
 
-
+# Generate a Four Circles sigma instance. 
 def generate_circles_sigma(p, selected):
+
     center_1 = np.array([np.random.uniform(0.1, 0.4), np.random.uniform(0.1, 0.4)])
     center_2 = np.array([np.random.uniform(0.1, 0.4), np.random.uniform(-0.4, -0.1)])
     center_3 = np.array([np.random.uniform(-0.4, -0.1), np.random.uniform(0.1, 0.4)])
@@ -46,7 +47,7 @@ def generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise):
     dtn_data, sol = dtn_map(v_h, sigma_vec_true)
 
     # add desired noise
-    noise_data = noise * dtn_data
+    noise_data = np.random.uniform(-noise, noise, dtn_data.shape) * dtn_data
     dtn_data = dtn_data + noise_data
 
     # initial guess: 1 is value of background medium
@@ -74,8 +75,7 @@ def generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise):
                      )
                        # callback=callback)
 
-    t_f = time.time()
-    print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
+    # t_f = time.time()
 
     return res.x
 
@@ -111,6 +111,7 @@ def main(
     GCOORD = generate_GCOORD(lx, ly, nx, ny)
     EL2NOD = assemble_EL_connectivity(nnod, nnodel, nex, nx)
 
+    # Load the mesh. 
     mat_fname  = os.path.join(data_root, mesh_file)
     mat_contents = sio.loadmat(mat_fname)
     
@@ -129,14 +130,9 @@ def main(
     imgs_true = np.zeros((num_samples, img_size, img_size))
     imgs_pred = np.zeros((num_samples, img_size, img_size))
 
-    print(imgs_true.shape)
-    print(imgs_pred.shape)
-    print(sigma_true.shape)
-    print(sigma_pred.shape)
 
     save_name = f"circles_bfgs_{str(num_iters)}_res_{str(img_size)}_noise_{str(noise)}"
     save_path = os.path.join(data_root, save_name)
-    print(save_path)
     
     for i in range(num_samples):
         k = np.random.randint(1, 5)
@@ -160,9 +156,6 @@ def main(
             sq_img_pred[iel] = np.mean(ECOORD_pred)
             
         t_f = time.time()
-        # print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
-        # print(i, flush=True)
-        
     
         sq_img_true = np.flip(sq_img_true.reshape((nx-1, ny-1)), axis=0)
         sq_img_pred = np.flip(sq_img_pred.reshape((nx-1, ny-1)), axis=0)
@@ -178,16 +171,9 @@ def main(
             npy_name = save_path
             np.savez(npy_name, imgs_true=imgs_true, imgs_pred=imgs_pred, sigma_true=sigma_true, sigma_pred=sigma_pred)
         
-        #append to big new dataset here
-        
-    #save big new dataset when done
-    print(imgs_true.shape, np.count_nonzero(imgs_true))
-    print(imgs_pred.shape, np.count_nonzero(imgs_pred))
-    
     np.savez(save_path, imgs_true=imgs_true, imgs_pred=imgs_pred, sigma_true=sigma_true, sigma_pred=sigma_pred)
         
 
-# Check if the script is being run directly (not imported)
 if __name__ == "__main__":
     main()
     

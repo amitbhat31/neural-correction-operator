@@ -1,3 +1,6 @@
+# Code for the EIT problem and computation of the Dirichlet-to-Neumann data.
+# Code from https://github.com/Forgotten/EIT/
+
 import numpy as np
 import numpy.linalg as npla
 import scipy.sparse as spsp

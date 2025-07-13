@@ -14,7 +14,7 @@ from fem import Mesh, V_h, dtn_map
 from utils import *
 from utils_shepp_logan import *
 
-
+# Generate a Shepp-Logan sigma instance. 
 def generate_shepp_logan_sigma(n, pad, GCOORD_down, centroids):
     sl = randomSheppLogan(n=n, pad = pad, M = 1).reshape((n + 2* pad, n + 2* pad))
     sl_sigma = interpolate_pts(GCOORD_down, sl.flatten(), centroids)
@@ -27,7 +27,7 @@ def generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise):
     dtn_data, sol = dtn_map(v_h, sigma_vec_true)
 
     # add desired noise
-    noise_data = noise * dtn_data
+    noise_data = np.random.uniform(-noise, noise, dtn_data.shape) * dtn_data
     dtn_data = dtn_data + noise_data
 
     # initial guess: 1 is value of background medium
@@ -45,7 +45,7 @@ def generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise):
     bounds_r = [np.inf for _ in range(len(sigma_vec_0))]
     bounds = Bounds(bounds_l, bounds_r)
 
-    t_i = time.time()
+    # t_i = time.time()
     res = op.minimize(J, sigma_vec_0, method='L-BFGS-B',
                       jac = True,
                       tol = opt_tol,
@@ -55,8 +55,7 @@ def generate_EIT_sol(num_iters, mesh, v_h, sigma_vec_true, noise):
                      )
                        # callback=callback)
 
-    t_f = time.time()
-    print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
+    # t_f = time.time()
 
     return res.x
 
@@ -92,11 +91,13 @@ def main(
     nnod        = nx*ny #number of nodes
     nel         = nex*ney #number of finite elements
 
-    img_size_down = original_size + 2*pad_size
+    img_size_down = original_size + 2 * pad_size
     x = np.linspace(-1, 1, img_size_down)
     y = np.linspace(-1, 1, img_size_down)
     xx, yy = np.meshgrid(x, y)
     img_points = np.stack([xx.ravel(), yy.ravel()]).T
+
+    # Generate a mesh for downsampling the original image. 
     GCOORD_down = img_points.reshape((img_size_down, img_size_down, 2))
     GCOORD_down = np.flip(GCOORD_down, axis=0)
     GCOORD_down = GCOORD_down.reshape((-1, 2))
@@ -117,21 +118,14 @@ def main(
     v_h = V_h(mesh)
     
     centroids = np.mean(p[t], axis=1)  
-    print("here")
     
     sigma_true = np.zeros((num_samples, len(centroids)))
     sigma_pred = np.zeros((num_samples, len(centroids)))
     imgs_true = np.zeros((num_samples, img_size, img_size))
     imgs_pred = np.zeros((num_samples, img_size, img_size))
 
-    print(imgs_true.shape)
-    print(imgs_pred.shape)
-    print(sigma_true.shape)
-    print(sigma_pred.shape)
-
     save_name = f"circles_bfgs_{str(num_iters)}_res_{str(img_size)}_noise_{str(noise)}"
     save_path = os.path.join(data_root, save_name)
-    print(save_path)
     
     for i in range(num_samples):
         sigma_vec_true = generate_shepp_logan_sigma(original_size, pad_size, GCOORD_down, centroids)
@@ -153,9 +147,6 @@ def main(
             sq_img_pred[iel] = np.mean(ECOORD_pred)
             
         t_f = time.time()
-        # print(f'Time elapsed is {(t_f - t_i):.4f}', flush=True)
-        # print(i, flush=True)
-        
     
         sq_img_true = np.flip(sq_img_true.reshape((nx-1, ny-1)), axis=0)
         sq_img_pred = np.flip(sq_img_pred.reshape((nx-1, ny-1)), axis=0)
@@ -171,12 +162,6 @@ def main(
             npy_name = save_path
             np.savez(npy_name, imgs_true=imgs_true, imgs_pred=imgs_pred, sigma_true=sigma_true, sigma_pred=sigma_pred)
         
-        #append to big new dataset here
-        
-    #save big new dataset when done
-    print(imgs_true.shape, np.count_nonzero(imgs_true))
-    print(imgs_pred.shape, np.count_nonzero(imgs_pred))
-    
     np.savez(save_path, imgs_true=imgs_true, imgs_pred=imgs_pred, sigma_true=sigma_true, sigma_pred=sigma_pred)
     
 

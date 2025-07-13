@@ -1,3 +1,6 @@
+# Code for the finite element method.
+# Code from https://github.com/Forgotten/EIT/
+
 import numpy as np
 import numpy.linalg as npla
 import scipy.sparse as spsp
@@ -360,59 +363,6 @@ def misfit_sigma(v_h, Data, sigma_vec):
     grad = M_w*np.sum(Sol_adj_x*Sol_x + Sol_adj_y*Sol_y, axis = 1);
 
     return 0.5*np.sum(np.square(residual)), grad
-
-# if __name__ == "__main__":
-
-#     x = np.linspace(0, 1, 11)
-
-#     mesh = Mesh(x)
-#     v_h = V_h(mesh)
-
-#     f_load = lambda x: 2 + 0 * x
-#     xi = f_load(x)  # linear function
-
-#     u = Function(xi, v_h)
-
-#     assert np.abs(u(x[5]) - f_load(x[5])) < 1.e-6
-
-#     # check if this is projection
-#     ph_f = p_h(v_h, f_load)
-#     ph_f2 = p_h(v_h, ph_f)
-
-#     assert np.max(ph_f.xi - ph_f2.xi) < 1.e-6
-
-#     # using analytical solution
-#     u = lambda x : np.sin(4*np.pi*x)
-#     # building the correct source file
-#     f = lambda x : (4*np.pi)**2*np.sin(4*np.pi*x)
-#     # conductivity is constant
-#     sigma = lambda x : 1 + 0*x  
-
-#     u_sol = solve_poisson_dirichelet(v_h, f, sigma)
-
-#     err = lambda x: np.square(u_sol(x) - u(x))
-#     # we use an fearly accurate quadrature 
-#     l2_err = np.sqrt(integrate.quad(err, 0.0, 1.)[0])
-
-#     print("L^2 error using %d points is %.6f" % (v_h.dim, l2_err))
-#     # this should be quite large
-
-#     # define a finer partition 
-#     x = np.linspace(0, 1, 21)
-#     # init mesh and fucntion space
-#     mesh = Mesh(x)
-#     v_h = V_h(mesh)
-
-#     u_sol = solve_poisson_dirichelet(v_h, f, sigma)
-
-#     err = lambda x: np.square(u_sol(x) - u(x))
-#     # we use an fearly accurate quadrature
-#     l2_err = np.sqrt(integrate.quad(err, 0.0, 1.)[0])
-
-#     # print the error
-#     print("L^2 error using %d points is %.6f" % (v_h.dim, l2_err))
-
-
 
 
 
